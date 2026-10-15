@@ -13,7 +13,6 @@ jobs:
     name: Extract source ZIP and build APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,40 +43,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP_FILE="HisabYar_Completed_Source_v0.2.0.zip"
-
+          ZIP_FILE="HisabYar_Completed_Source_v0.2.1.zip"
           if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
-            echo "فایل‌های ZIP موجود در مخزن:"
-            find "$GITHUB_WORKSPACE" \
-              -maxdepth 3 -type f -iname '*.zip' -print || true
+            echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد. فایل ZIP سورس را کنار README بارگذاری کن."
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
             exit 1
           fi
-
           mkdir -p "$GITHUB_WORKSPACE/extracted_source"
-
-          unzip -q \
-            "$GITHUB_WORKSPACE/$ZIP_FILE" \
-            -d "$GITHUB_WORKSPACE/extracted_source"
-
-          SETTINGS_FILE="$(
-            find "$GITHUB_WORKSPACE/extracted_source" \
-              -type f \
-              \( -name settings.gradle -o -name settings.gradle.kts \) \
-              -print -quit
-          )"
-
+          unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" -d "$GITHUB_WORKSPACE/extracted_source"
+          SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/extracted_source" -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "::error::فایل settings.gradle یا settings.gradle.kts داخل ZIP پیدا نشد."
-            echo "محتویات استخراج‌شده:"
-            find "$GITHUB_WORKSPACE/extracted_source" \
-              -maxdepth 4 -type f -print || true
+            echo "::error::settings.gradle یا settings.gradle.kts داخل ZIP پیدا نشد."
             exit 1
           fi
-
           PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
 
@@ -86,48 +65,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           test -s settings.gradle -o -s settings.gradle.kts
           test -s build.gradle -o -s build.gradle.kts
           test -s app/src/main/AndroidManifest.xml
-
+          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           if [ ! -s app/build.gradle ] && [ ! -s app/build.gradle.kts ]; then
-            echo "::error::فایل build.gradle یا build.gradle.kts در پوشه app پیدا نشد."
+            echo "::error::فایل Gradle ماژول app پیدا نشد."
             exit 1
           fi
-
-          if [ ! -d app/src/main ]; then
-            echo "::error::پوشه app/src/main پیدا نشد."
+          grep -q "versionName '0.2.1'" app/build.gradle
+          grep -q 'showDebts' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'showBudgets' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'exportBackup' app/src/main/java/com/example/hisabyar/MainActivity.java
+          if grep -nF 'addEmpty("درآمد: "' app/src/main/java/com/example/hisabyar/MainActivity.java | grep -q '"$'; then
+            echo "::error::رشته گزارش درآمد/هزینه احتمالاً شکسته است."
             exit 1
           fi
-
-          echo "ساختار اصلی پروژه بررسی شد."
+          echo "Source validation passed."
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          gradle --no-daemon clean assembleDebug --stacktrace
+        run: gradle --no-daemon clean assembleDebug --stacktrace
 
       - name: Verify APK
         working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          APK_FILE="app/build/outputs/apk/debug/app-debug.apk"
-
-          if [ ! -s "$APK_FILE" ]; then
-            echo "::error::فایل APK ساخته نشد."
-            exit 1
-          fi
-
-          echo "APK ساخته شد:"
-          ls -lh "$APK_FILE"
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-debug-APK
+          name: HisabYar-debug-APK-v0.2.1
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
