@@ -1,168 +1,107 @@
-name: Build Gol Negar APK
+name: Build HisabYar Offline APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main, master]
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build and verify local-only Android app
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v5
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle 8.11.1
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Locate exact Gol Negar source
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Install Android SDK packages
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Extract HisabYar source
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="GolNegar_v1.4.5_VersionThenUserName.zip"
-
-          echo "========================================"
-          echo "BUILDING GOL NEGAR V1.4.5"
-          echo "========================================"
-
-          if [ ! -f "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "ERROR: Exact source ZIP not found: $ZIP_FILE"
-            echo "ZIP files found in repository:"
-            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print | sort
+          ZIP_FILE="HisabYar_Offline_v1.4.5.zip"
+          if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
+            echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
             exit 1
           fi
-
-          rm -rf "$GITHUB_WORKSPACE/build_source"
-          mkdir -p "$GITHUB_WORKSPACE/build_source"
-          unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" -d "$GITHUB_WORKSPACE/build_source"
-
-          PROJECT_SETTINGS="$(find "$GITHUB_WORKSPACE/build_source" -type f -name settings.gradle.kts -print -quit)"
-          if [ -z "$PROJECT_SETTINGS" ]; then
-            echo "ERROR: settings.gradle.kts not found inside source ZIP."
+          mkdir -p "$GITHUB_WORKSPACE/source"
+          unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" -d "$GITHUB_WORKSPACE/source"
+          SETTINGS="$(find "$GITHUB_WORKSPACE/source" -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+          if [ -z "$SETTINGS" ]; then
+            echo "::error::فایل تنظیمات Gradle داخل ZIP پیدا نشد."
             exit 1
           fi
-
-          PROJECT_DIR="$(dirname "$PROJECT_SETTINGS")"
+          PROJECT_DIR="$(dirname "$SETTINGS")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "PROJECT_DIR=$PROJECT_DIR"
+          echo "Project directory: $PROJECT_DIR"
 
-      - name: Validate source
+      - name: Validate app source and offline policy
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
-
-          test -f settings.gradle.kts
-          test -f build.gradle.kts
-          test -f app/build.gradle.kts
-          test -f app/google-services.json
-          test -f firestore.rules
-          test -s app/src/main/java/com/example/golyar/MainActivity.kt
-          test -f app/src/main/res/drawable/ic_bouquet.png
-          test -f smoke_test.py
-
-          grep -q 'versionName = "1.4.5"' app/build.gradle.kts
-          grep -q 'versionCode = 75' app/build.gradle.kts
-
-          echo "Checking safe Back navigation..."
-          grep -q 'private fun detachFromParent(view: View)' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'detachFromParent(root)' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'OnBackPressedCallback' app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "Checking miscellaneous-sales data path..."
-          grep -q 'misc_sales' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'fun miscSales()' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q '馃Ь 賮乇賵卮 賲鬲賮乇賯賴 诏賱禺丕賳賴' app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "Checking greenhouse-expense data path..."
-          grep -q 'greenhouse_payments' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'fun greenhousePayments()' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q '馃挵 賴夭蹖賳賴鈥屬囏й� 诏賱禺丕賳賴' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'private fun renderGreenhouseExpensesPage(title: String, subtitle: String)' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'private fun showMiscSalesReport()' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'private fun showGreenhouseExpensesReport()' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'sameLogicalScreen' app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "Checking local-first report rendering..."
-          grep -q 'private fun refreshAdminDataAndShow(after: () -> Unit)' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'after()' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'val saved=db.addMiscSale' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'val saved=db.addGreenhouseExpense' app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "Checking unified financial report..."
-          grep -q 'private fun showFinancialReport()' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q '诏夭丕乇卮 賲丕賱蹖 噩丕賲毓' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'miscTotal' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'expenseTotal' app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "Checking Firebase pull for both collections..."
-          grep -q '"misc_sales", "greenhouse_payments"' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'whereEqualTo("seller_remote_id", sellerRemoteId)' app/src/main/java/com/example/golyar/MainActivity.kt
-          grep -q 'fs.collection("users")' app/src/main/java/com/example/golyar/MainActivity.kt
-
-          echo "Source validation PASSED."
-
-      - name: Run smoke and report tests
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python smoke_test.py
-
-      - name: Build Gol Negar v1.4.5
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set +e
-          gradle clean assembleDebug --no-daemon --stacktrace --info 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
-          STATUS=${PIPESTATUS[0]}
-          echo "GRADLE EXIT CODE: $STATUS"
-
-          if [ "$STATUS" -ne 0 ]; then
-            echo "================ BUILD ERRORS ================"
-            grep -n -E '(^|[^A-Za-z])(e:|error:|ERROR|FAILURE:|Execution failed|Syntax error|Unresolved reference|CompilationErrorException|Caused by:)' "$GITHUB_WORKSPACE/build.log" | tail -n 300 || true
-            echo "================ LAST LOG LINES ================"
-            tail -n 350 "$GITHUB_WORKSPACE/build.log"
+          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
+          test -s app/src/main/AndroidManifest.xml
+          grep -q "versionName '1.4.5'" app/build.gradle
+          if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
+            echo "::error::این برنامه باید کاملاً آفلاین بماند."
+            exit 1
           fi
+          grep -q 'recurring' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'current_amount' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'transfer_id' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'PRAGMA integrity_check' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'exportTransactionsCsv' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'payment_method' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'bank_name' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'processVoiceCommand' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'matchExistingVoiceCategory' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'bankAliases' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'closed_months' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'showAccountTransactions' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'account_uid' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'manageAccountLinks' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'دفتر:' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'month_key' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'SpeechRecognizer.createSpeechRecognizer' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'android.speech.RecognitionService' app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.RECORD_AUDIO' app/src/main/AndroidManifest.xml
 
-          exit "$STATUS"
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle --no-daemon clean assembleDebug --stacktrace
 
-      - name: Upload build log
-        if: always()
+      - name: Verify APK exists
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: GolNegar-v1.4.5-build-log
-          path: build.log
-          if-no-files-found: warn
-
-      - name: Prepare APK
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK_SOURCE="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-          test -f "$APK_SOURCE"
-
-          mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$APK_SOURCE" "$GITHUB_WORKSPACE/release/GolNegar-v1.4.5-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/release/GolNegar-v1.4.5-debug.apk"
-
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: GolNegar-v1.4.5-debug.apk
-          path: release/GolNegar-v1.4.5-debug.apk
+          name: HisabYar-Offline-v1.4.5-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 30
