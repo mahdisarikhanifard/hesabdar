@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="HisabYar_Offline_v1.4.0.zip"
+          ZIP_FILE="HisabYar_Offline_v1.4.1.zip"
           if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
             echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
             find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
-          grep -q "versionName '1.4.0'" app/build.gradle
+          grep -q "versionName '1.4.1'" app/build.gradle
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
             echo "::error::این برنامه باید کاملاً آفلاین بماند."
             exit 1
@@ -82,6 +82,9 @@ jobs:
           grep -q 'bankAliases' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'closed_months' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'showAccountTransactions' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'account_uid' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'manageAccountLinks' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'دفتر:' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'month_key' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'SpeechRecognizer.createSpeechRecognizer' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'android.speech.RecognitionService' app/src/main/AndroidManifest.xml
@@ -98,7 +101,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Offline-v1.4.0-APK
+          name: HisabYar-Offline-v1.4.1-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
