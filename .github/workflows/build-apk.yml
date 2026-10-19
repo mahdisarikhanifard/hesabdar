@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="HisabYar_Pro_Offline_v1.4.7.zip"
+          ZIP_FILE="HisabYar_Pro_Offline_v1.4.8.zip"
           if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
             echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
             find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
-          grep -q "versionName '1.4.7-Pro'" app/build.gradle
+          grep -q "versionName '1.4.8-Pro'" app/build.gradle
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
             echo "::error::این برنامه باید کاملاً آفلاین بماند."
             exit 1
@@ -104,7 +104,11 @@ jobs:
           rm -rf app/src/main/assets/model-fa
           mv "$MODEL_DIR" app/src/main/assets/model-fa
           test -s app/src/main/assets/model-fa/conf/model.conf
-          echo "Bundled Persian Vosk model: $(du -sh app/src/main/assets/model-fa | cut -f1)"
+          test -d app/src/main/assets/model-fa/am
+          test -d app/src/main/assets/model-fa/graph
+          test -d app/src/main/assets/model-fa/conf
+          echo "Model files validated. Bundled Persian Vosk model: $(du -sh app/src/main/assets/model-fa | cut -f1)"
+          find app/src/main/assets/model-fa -maxdepth 2 -type f | head -30
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
@@ -117,7 +121,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-Voice-v1.4.7-APK
+          name: HisabYar-Pro-Offline-Voice-v1.4.8-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
