@@ -1,4 +1,4 @@
-name: Build HisabYar Offline APK
+name: Build HisabYar Pro Offline Voice APK
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify local-only Android app
+    name: Build and verify HisabYar Pro with embedded Persian offline speech model
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="HisabYar_Offline_v1.4.6.zip"
+          ZIP_FILE="HisabYar_Pro_Offline_v1.4.7.zip"
           if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
             echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
             find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
-          grep -q "versionName '1.4.6'" app/build.gradle
+          grep -q "versionName '1.4.7-Pro'" app/build.gradle
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
             echo "::error::این برنامه باید کاملاً آفلاین بماند."
             exit 1
@@ -78,7 +78,6 @@ jobs:
           grep -q 'bank_name' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'lastCuePosition' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'processVoiceCommand' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'matchExistingVoiceCategory' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'bankAliases' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'closed_months' app/src/main/java/com/example/hisabyar/MainActivity.java
@@ -87,9 +86,25 @@ jobs:
           grep -q 'manageAccountLinks' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'دفتر:' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'month_key' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'SpeechRecognizer.createSpeechRecognizer' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'android.speech.RecognitionService' app/src/main/AndroidManifest.xml
+          grep -q 'org.vosk.android.SpeechService' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'android.permission.RECORD_AUDIO' app/src/main/AndroidManifest.xml
+
+      - name: Download and bundle Persian offline speech model
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip" \
+            -o /tmp/vosk-model-fa.zip
+          unzip -q /tmp/vosk-model-fa.zip -d /tmp/vosk-fa
+          MODEL_DIR="$(find /tmp/vosk-fa -mindepth 1 -maxdepth 1 -type d -name 'vosk-model-small-fa-0.42' -print -quit)"
+          test -n "$MODEL_DIR"
+          rm -rf app/src/main/assets/model-fa
+          mv "$MODEL_DIR" app/src/main/assets/model-fa
+          test -s app/src/main/assets/model-fa/conf/model.conf
+          echo "Bundled Persian Vosk model: $(du -sh app/src/main/assets/model-fa | cut -f1)"
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
@@ -102,7 +117,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Offline-v1.4.6-APK
+          name: HisabYar-Pro-Offline-Voice-v1.4.7-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
