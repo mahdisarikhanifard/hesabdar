@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="HisabYar_Pro_Offline_v1.4.8.zip"
+          ZIP_FILE="HisabYar_Pro_Offline_v1.4.9.zip"
           if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
             echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
             find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
-          grep -q "versionName '1.4.8-Pro'" app/build.gradle
+          grep -q "versionName '1.4.9-Pro'" app/build.gradle
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
             echo "::error::این برنامه باید کاملاً آفلاین بماند."
             exit 1
@@ -89,24 +89,38 @@ jobs:
           grep -q 'org.vosk.android.SpeechService' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'android.permission.RECORD_AUDIO' app/src/main/AndroidManifest.xml
 
+      - name: Cache Persian Vosk model to reduce repeat downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PROJECT_DIR }}/app/src/main/assets/model-fa
+          key: vosk-model-small-fa-0.42-fa-v1
+
       - name: Download and bundle Persian offline speech model
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p app/src/main/assets
-          curl --fail --location --retry 3 --retry-delay 2 \
-            "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip" \
-            -o /tmp/vosk-model-fa.zip
-          unzip -q /tmp/vosk-model-fa.zip -d /tmp/vosk-fa
-          MODEL_DIR="$(find /tmp/vosk-fa -mindepth 1 -maxdepth 1 -type d -name 'vosk-model-small-fa-0.42' -print -quit)"
-          test -n "$MODEL_DIR"
-          rm -rf app/src/main/assets/model-fa
-          mv "$MODEL_DIR" app/src/main/assets/model-fa
+          if [ ! -s app/src/main/assets/model-fa/conf/model.conf ] || [ ! -s app/src/main/assets/model-fa/am/final.mdl ]; then
+            echo "Cached model missing or incomplete; downloading model only because cache is unavailable."
+            rm -rf app/src/main/assets/model-fa /tmp/vosk-fa
+            mkdir -p /tmp/vosk-fa
+            curl --fail --location --retry 3 --retry-delay 2 \
+              "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip" \
+              -o /tmp/vosk-model-fa.zip
+            unzip -q /tmp/vosk-model-fa.zip -d /tmp/vosk-fa
+            MODEL_DIR="$(find /tmp/vosk-fa -mindepth 1 -maxdepth 1 -type d -name 'vosk-model-small-fa-0.42' -print -quit)"
+            test -n "$MODEL_DIR"
+            mv "$MODEL_DIR" app/src/main/assets/model-fa
+          else
+            echo "Using cached Persian Vosk model; skipping model download."
+          fi
           test -s app/src/main/assets/model-fa/conf/model.conf
+          test -s app/src/main/assets/model-fa/am/final.mdl
           test -d app/src/main/assets/model-fa/am
           test -d app/src/main/assets/model-fa/graph
           test -d app/src/main/assets/model-fa/conf
+          echo "Model file count: $(find app/src/main/assets/model-fa -type f | wc -l)"
           echo "Model files validated. Bundled Persian Vosk model: $(du -sh app/src/main/assets/model-fa | cut -f1)"
           find app/src/main/assets/model-fa -maxdepth 2 -type f | head -30
 
@@ -118,10 +132,22 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: test -s app/build/outputs/apk/debug/app-debug.apk
 
+      - name: Verify model files are actually embedded in APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          unzip -l "$APK" | grep -F 'assets/model-fa/conf/model.conf'
+          unzip -l "$APK" | grep -F 'assets/model-fa/am/final.mdl'
+          COUNT="$(unzip -l "$APK" | grep -c 'assets/model-fa/' || true)"
+          echo "Embedded model asset entries in APK: $COUNT"
+          if [ "$COUNT" -lt 10 ]; then echo "::error::Too few Vosk model files embedded in APK"; exit 1; fi
+
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-Voice-v1.4.8-APK
+          name: HisabYar-Pro-Offline-Voice-v1.4.9-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
