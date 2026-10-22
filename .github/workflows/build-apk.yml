@@ -16,25 +16,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare project source
+      - name: Prepare exact version 1.6.1 source
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f app/build.gradle ]]; then
-            ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*HisabYar*Offline*.zip' -print -quit)"
-            if [[ -z "$ZIP_FILE" ]]; then
-              echo 'Project source missing. Upload the complete HisabYar offline ZIP to the repository root.'
-              exit 1
-            fi
-            mkdir -p /tmp/hisabyar-source
-            unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
-            PROJECT_ROOT="$(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print -quit | sed 's#/app/build.gradle$##')"
-            if [[ -z "$PROJECT_ROOT" ]]; then echo 'ZIP does not contain app/build.gradle'; exit 1; fi
-            cp -a "$PROJECT_ROOT"/. .
+          # Prefer the exact v1.6.1 source ZIP. Never select an older ZIP by wildcard.
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.6.1_Source.zip"
+          if [[ ! -f "$ZIP_FILE" ]]; then
+            echo "::error::Missing $ZIP_FILE. Upload the complete v1.6.1 source ZIP to the repository root, or upload the extracted project files."
+            echo "ZIP files found in repository root:"
+            find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
+            exit 1
           fi
-          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
-          test -s app/src/main/AndroidManifest.xml
-          echo 'Project source prepared.'
+          rm -rf /tmp/hisabyar-source
+          mkdir -p /tmp/hisabyar-source
+          unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
+          mapfile -t GRADLE_FILES < <(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print)
+          if [[ "${#GRADLE_FILES[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one app/build.gradle in the source ZIP. Found: ${#GRADLE_FILES[@]}"
+            printf '%s\n' "${GRADLE_FILES[@]}"
+            exit 1
+          fi
+          GRADLE_FILE="${GRADLE_FILES[0]}"
+          PROJECT_ROOT="${GRADLE_FILE%/app/build.gradle}"
+          echo "Detected project root: $PROJECT_ROOT"
+          grep -n 'versionName' "$GRADLE_FILE"
+          grep -q "versionName '1.6.1-Pro'" "$GRADLE_FILE"
+          grep -q "cz.adaptech.tesseract4android:tesseract4android:4.9.0" "$GRADLE_FILE"
+          test -s "$PROJECT_ROOT/settings.gradle"
+          test -s "$PROJECT_ROOT/app/src/main/AndroidManifest.xml"
+          test -s "$PROJECT_ROOT/app/src/main/java/com/example/hisabyar/MainActivity.java"
+          # Copy project files into the checked-out repository root, preserving the workflow just checked out.
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' -exec rm -rf {} +
+          cp -a "$PROJECT_ROOT"/. .
+          echo "Project version: $(grep 'versionName' app/build.gradle)"
+          echo 'Project source prepared successfully.'
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -109,24 +125,43 @@ jobs:
           echo 'OCR models bundled:'
           du -h app/src/main/assets/tessdata/*.traineddata
 
-      - name: Validate source, model files, and offline policy
+      - name: Validate source, model files, and offline policy (diagnostic)
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "versionName '1.6.1-Pro'" app/build.gradle
-          grep -q "cz.adaptech.tesseract4android:tesseract4android:4.9.0" app/build.gradle
-          grep -q 'TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'OEM_LSTM_ONLY' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'jitpack.io' settings.gradle
-          grep -q 'tessdata/fas.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'tessdata/eng.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
-          test -s app/src/main/assets/model-fa/uuid
-          test -s app/src/main/assets/model-fa/conf/model.conf
-          test -s app/src/main/assets/tessdata/fas.traineddata
-          test -s app/src/main/assets/tessdata/eng.traineddata
+          check_file() {
+            if [[ ! -s "$1" ]]; then
+              echo "::error::Required file is missing or empty: $1"
+              echo 'Nearby files:'
+              find "$(dirname "$1")" -maxdepth 2 -type f -printf '%p (%s bytes)\n' 2>/dev/null | head -80 || true
+              exit 1
+            fi
+            echo "OK file: $1 ($(stat -c%s "$1") bytes)"
+          }
+          check_text() {
+            if ! grep -Fq -- "$2" "$1"; then
+              echo "::error::Required text not found in $1: $2"
+              exit 1
+            fi
+            echo "OK text in $1: $2"
+          }
+          check_text app/build.gradle "versionName '1.6.1-Pro'"
+          check_text app/build.gradle "cz.adaptech.tesseract4android:tesseract4android:4.9.0"
+          check_text app/src/main/java/com/example/hisabyar/MainActivity.java 'TessBaseAPI'
+          check_text app/src/main/java/com/example/hisabyar/MainActivity.java 'OEM_LSTM_ONLY'
+          check_text settings.gradle 'jitpack.io'
+          check_text app/src/main/java/com/example/hisabyar/MainActivity.java 'tessdata/fas.traineddata'
+          check_text app/src/main/java/com/example/hisabyar/MainActivity.java 'tessdata/eng.traineddata'
+          check_file app/src/main/assets/model-fa/uuid
+          check_file app/src/main/assets/model-fa/conf/model.conf
+          check_file app/src/main/assets/model-fa/am/final.mdl
+          check_file app/src/main/assets/tessdata/fas.traineddata
+          check_file app/src/main/assets/tessdata/eng.traineddata
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
-            echo 'App must not request Internet permission.'; exit 1
+            echo '::error::App must not request Internet permission.'
+            exit 1
           fi
+          echo 'OK: offline manifest policy'
 
       - name: Build APK
         run: gradle --no-daemon clean assembleDebug --stacktrace
