@@ -3,7 +3,9 @@ name: Build HisabYar Pro Offline v1.6.0
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
 
 permissions:
   contents: read
@@ -12,6 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,41 +23,68 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Repository files matching ZIPs:"
-          find . -type f -iname '*.zip' -print || true
-          ZIP_FILE="$(find . -type f -iname '*HisabYar*Offline*.zip' -print -quit)"
-          if [[ -z "$ZIP_FILE" ]]; then
-            echo '::error::No HisabYar Offline ZIP found anywhere in the repository. Upload HisabYar_Pro_Offline_v1.6.0_Voice_OCR_Fixed.zip to the repository.'
+
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.6.0_Voice_OCR_Fixed.zip"
+
+          echo "Looking for the exact project ZIP..."
+
+          if [[ ! -f "$ZIP_FILE" ]]; then
+            echo "::error::Project ZIP not found: $ZIP_FILE"
+            echo "ZIP files available in repository:"
+            find . -maxdepth 3 -type f -iname '*.zip' -print || true
             exit 1
           fi
-          echo "Using complete project ZIP: $ZIP_FILE"
+
+          echo "Using project ZIP: $ZIP_FILE"
+
           rm -rf /tmp/hisabyar-source
           mkdir -p /tmp/hisabyar-source
+
           unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
-          PROJECT_ROOT="$(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print -quit | sed 's#/app/build.gradle$##')"
+
+          PROJECT_ROOT="$(
+            find /tmp/hisabyar-source \
+              -type f \
+              -path '*/app/build.gradle' \
+              -print -quit |
+              sed 's#/app/build.gradle$##'
+          )"
+
           if [[ -z "$PROJECT_ROOT" ]]; then
-            echo '::error::ZIP does not contain app/build.gradle'
+            echo "::error::The ZIP does not contain app/build.gradle"
             unzip -l "$ZIP_FILE" | head -80
             exit 1
           fi
+
           echo "Project root inside ZIP: $PROJECT_ROOT"
-          echo 'Gradle version line inside ZIP:'
+
+          echo "Version declared inside ZIP:"
           grep -n 'versionName' "$PROJECT_ROOT/app/build.gradle" || true
-          # Replace the repository's potentially stale source with the ZIP contents.
+
+          if ! grep -q "versionName '1.6.0-Pro'" \
+            "$PROJECT_ROOT/app/build.gradle"; then
+            echo "::error::The selected ZIP does not contain version 1.6.0-Pro"
+            exit 1
+          fi
+
+          if ! grep -q "com.rmtheis:tess-two:9.1.0" \
+            "$PROJECT_ROOT/app/build.gradle"; then
+            echo "::error::Required Tesseract dependency is missing from the ZIP"
+            exit 1
+          fi
+
           cp -a "$PROJECT_ROOT"/. .
-          echo 'Gradle version line after extraction:'
-          grep -n 'versionName' app/build.gradle || true
-          grep -q "versionName '1.6.0-Pro'" app/build.gradle || {
-            echo '::error::The ZIP was found, but its app/build.gradle does not declare versionName 1.6.0-Pro.'
-            exit 1
-          }
-          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle || {
-            echo '::error::The selected ZIP does not contain the required Tesseract dependency.'
-            exit 1
-          }
+
+          echo "Version after extraction:"
+          grep -n 'versionName' app/build.gradle
+
+          grep -q "versionName '1.6.0-Pro'" app/build.gradle
+          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle
+
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
-          echo 'Project source prepared successfully from ZIP.'
+
+          echo "Project source prepared successfully."
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -72,108 +102,238 @@ jobs:
         with:
           packages: 'platform-tools'
 
-      - name: Install SDK packages
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Download and bundle Persian offline speech model
         shell: bash
         run: |
           set -euo pipefail
+
           mkdir -p app/src/main/assets
+
+          echo "Downloading Persian Vosk model..."
+
           curl --fail --location --retry 3 --retry-delay 2 \
             'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip' \
             -o /tmp/vosk-fa.zip
+
           mkdir -p /tmp/vosk-fa
           unzip -q /tmp/vosk-fa.zip -d /tmp/vosk-fa
-          MODEL_DIR="$(find /tmp/vosk-fa -type f -path '*/am/final.mdl' -print -quit | sed 's#/am/final.mdl$##')"
+
+          MODEL_DIR="$(
+            find /tmp/vosk-fa \
+              -type f \
+              -path '*/am/final.mdl' \
+              -print -quit |
+              sed 's#/am/final.mdl$##'
+          )"
+
           if [[ -z "$MODEL_DIR" ]]; then
-            echo '::error::فایل اصلی مدل Vosk یعنی am/final.mdl در ZIP پیدا نشد.'
-            find /tmp/vosk-fa -maxdepth 3 -type f | head -80
+            echo "::error::Vosk model file am/final.mdl was not found"
+            find /tmp/vosk-fa -maxdepth 5 -type f | head -100
             exit 1
           fi
-          # Some official model archives omit metadata files expected by
-          # Vosk Android StorageService. Supply them when absent.
+
+          echo "Vosk model directory: $MODEL_DIR"
+
+          test -s "$MODEL_DIR/am/final.mdl"
+
           mkdir -p "$MODEL_DIR/conf"
+
           if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
             cat > "$MODEL_DIR/conf/model.conf" <<'EOF'
           --beam=13.0
           --lattice-beam=6.0
           EOF
           fi
+
           if [[ ! -s "$MODEL_DIR/uuid" ]]; then
-            printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.6.0' > "$MODEL_DIR/uuid"
+            printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.6.0' \
+              > "$MODEL_DIR/uuid"
           fi
+
           test -s "$MODEL_DIR/am/final.mdl"
           test -s "$MODEL_DIR/conf/model.conf"
           test -s "$MODEL_DIR/uuid"
+
           rm -rf app/src/main/assets/model-fa
-          cp -a "$MODEL_DIR" app/src/main/assets/model-fa
+
+          mkdir -p app/src/main/assets/model-fa
+
+          cp -a "$MODEL_DIR"/. app/src/main/assets/model-fa/
+
+          echo "Checking bundled Vosk files..."
+
           test -s app/src/main/assets/model-fa/am/final.mdl
           test -s app/src/main/assets/model-fa/uuid
           test -s app/src/main/assets/model-fa/conf/model.conf
-          echo "Vosk Persian model bundled: $(du -sh app/src/main/assets/model-fa | cut -f1)"
+
+          du -sh app/src/main/assets/model-fa
+
+          echo "Persian speech model prepared."
 
       - name: Download and bundle Persian and English OCR models
         shell: bash
         run: |
           set -euo pipefail
+
           mkdir -p app/src/main/assets/tessdata
+
+          echo "Downloading Persian OCR model..."
+
           curl --fail --location --retry 3 --retry-delay 2 \
             'https://github.com/tesseract-ocr/tessdata_fast/raw/refs/heads/main/fas.traineddata' \
             -o app/src/main/assets/tessdata/fas.traineddata
+
+          echo "Downloading English OCR model..."
+
           curl --fail --location --retry 3 --retry-delay 2 \
             'https://github.com/tesseract-ocr/tessdata_fast/raw/refs/heads/main/eng.traineddata' \
             -o app/src/main/assets/tessdata/eng.traineddata
-          test "$(stat -c%s app/src/main/assets/tessdata/fas.traineddata)" -gt 100000
-          test "$(stat -c%s app/src/main/assets/tessdata/eng.traineddata)" -gt 100000
-          echo 'OCR models bundled:'
-          du -h app/src/main/assets/tessdata/*.traineddata
 
-      - name: Validate source, model files, and offline policy
+          for f in \
+            app/src/main/assets/tessdata/fas.traineddata \
+            app/src/main/assets/tessdata/eng.traineddata
+          do
+            if [[ ! -s "$f" ]]; then
+              echo "::error::OCR model is missing or empty: $f"
+              exit 1
+            fi
+
+            size=$(stat -c%s "$f")
+
+            if [[ "$size" -le 100000 ]]; then
+              echo "::error::OCR model file is unexpectedly small: $f ($size bytes)"
+              exit 1
+            fi
+
+            echo "$f: $size bytes"
+          done
+
+          echo "Both OCR models downloaded successfully."
+
+      - name: Validate source and offline assets
         shell: bash
         run: |
           set -euo pipefail
-          fail() { echo "::error::$1"; exit 1; }
-          echo 'Checking app source and version...'
-          grep -q "versionName '1.6.0-Pro'" app/build.gradle || fail "app/build.gradle does not declare versionName 1.6.0-Pro"
-          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle || fail "Tesseract dependency com.rmtheis:tess-two:9.1.0 is missing"
-          MAIN=app/src/main/java/com/example/hisabyar/MainActivity.java
-          test -s "$MAIN" || fail "MainActivity.java not found at expected path: $MAIN"
-          grep -q 'TessBaseAPI' "$MAIN" || fail 'MainActivity does not use TessBaseAPI'
-          grep -q 'tessdata/fas.traineddata' "$MAIN" || fail 'MainActivity does not load the Persian OCR model'
-          grep -q 'tessdata/eng.traineddata' "$MAIN" || fail 'MainActivity does not load the English OCR model'
-          echo 'Checking downloaded Vosk assets...'
-          for f in app/src/main/assets/model-fa/am/final.mdl app/src/main/assets/model-fa/uuid app/src/main/assets/model-fa/conf/model.conf; do
-            if [[ ! -s "$f" ]]; then echo '::error::Missing or empty required Vosk asset:' "$f"; find app/src/main/assets/model-fa -maxdepth 4 -type f -printf '%p (%s bytes)\n' 2>/dev/null || true; exit 1; fi
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          echo "Checking app version..."
+
+          grep -q "versionName '1.6.0-Pro'" app/build.gradle \
+            || fail "Incorrect app version"
+
+          echo "Checking Tesseract dependency..."
+
+          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle \
+            || fail "Tesseract dependency is missing"
+
+          MAIN="app/src/main/java/com/example/hisabyar/MainActivity.java"
+
+          test -s "$MAIN" \
+            || fail "MainActivity.java is missing"
+
+          grep -q 'TessBaseAPI' "$MAIN" \
+            || fail "TessBaseAPI usage was not found"
+
+          grep -q 'tessdata/fas.traineddata' "$MAIN" \
+            || fail "Persian OCR model loading code was not found"
+
+          grep -q 'tessdata/eng.traineddata' "$MAIN" \
+            || fail "English OCR model loading code was not found"
+
+          echo "Checking Persian speech model..."
+
+          for f in \
+            app/src/main/assets/model-fa/am/final.mdl \
+            app/src/main/assets/model-fa/uuid \
+            app/src/main/assets/model-fa/conf/model.conf
+          do
+            if [[ ! -s "$f" ]]; then
+              echo "::error::Missing Vosk asset: $f"
+              find app/src/main/assets/model-fa \
+                -maxdepth 5 -type f -print 2>/dev/null || true
+              exit 1
+            fi
           done
-          echo 'Checking downloaded OCR assets...'
-          for f in app/src/main/assets/tessdata/fas.traineddata app/src/main/assets/tessdata/eng.traineddata; do
-            if [[ ! -s "$f" ]]; then echo '::error::Missing or empty OCR model:' "$f"; find app/src/main/assets -maxdepth 4 -type f -printf '%p (%s bytes)\n' 2>/dev/null || true; exit 1; fi
+
+          echo "Checking OCR models..."
+
+          for f in \
+            app/src/main/assets/tessdata/fas.traineddata \
+            app/src/main/assets/tessdata/eng.traineddata
+          do
+            if [[ ! -s "$f" ]]; then
+              echo "::error::Missing OCR asset: $f"
+              exit 1
+            fi
+
             size=$(stat -c%s "$f")
-            if [[ "$size" -le 100000 ]]; then fail "OCR model is too small or invalid: $f ($size bytes)"; fi
+
+            if [[ "$size" -le 100000 ]]; then
+              fail "OCR model file is too small: $f"
+            fi
           done
-          echo 'Checking that app does not request Internet permission...'
-          if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
-            fail 'App must not request Internet permission.'
+
+          echo "Checking offline permission policy..."
+
+          if grep -q 'android.permission.INTERNET' \
+            app/src/main/AndroidManifest.xml; then
+            fail "The app requests Internet permission"
           fi
-          echo 'All source, model, and offline-policy checks passed.'
+
+          echo "All source and asset checks passed."
 
       - name: Build APK
-        run: gradle --no-daemon clean assembleDebug --stacktrace
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon clean assembleDebug --stacktrace
 
       - name: Verify models are embedded in APK
         shell: bash
         run: |
           set -euo pipefail
-          APK=app/build/outputs/apk/debug/app-debug.apk
-          test -s "$APK"
+
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [[ ! -s "$APK" ]]; then
+            echo "::error::APK was not generated"
+            exit 1
+          fi
+
+          echo "Checking embedded speech model..."
+
+          unzip -l "$APK" | grep -F 'assets/model-fa/am/final.mdl'
           unzip -l "$APK" | grep -F 'assets/model-fa/uuid'
           unzip -l "$APK" | grep -F 'assets/model-fa/conf/model.conf'
+
+          echo "Checking embedded OCR models..."
+
           unzip -l "$APK" | grep -F 'assets/tessdata/fas.traineddata'
           unzip -l "$APK" | grep -F 'assets/tessdata/eng.traineddata'
-          unzip -p "$APK" assets/tessdata/fas.traineddata | wc -c | awk '$1 > 100000 {ok=1} END {exit !ok}'
-          unzip -p "$APK" assets/tessdata/eng.traineddata | wc -c | awk '$1 > 100000 {ok=1} END {exit !ok}'
-          echo "APK size: $(du -h "$APK" | cut -f1)"
+
+          unzip -p "$APK" assets/tessdata/fas.traineddata \
+            | wc -c \
+            | awk '$1 > 100000 {ok=1} END {exit !ok}'
+
+          unzip -p "$APK" assets/tessdata/eng.traineddata \
+            | wc -c \
+            | awk '$1 > 100000 {ok=1} END {exit !ok}'
+
+          echo "APK generated successfully."
+          echo "APK size:"
+          du -h "$APK"
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
