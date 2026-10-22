@@ -20,20 +20,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f app/build.gradle ]]; then
-            ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*HisabYar*Offline*.zip' -print -quit)"
-            if [[ -z "$ZIP_FILE" ]]; then
-              echo 'Project source missing. Upload the complete HisabYar offline ZIP to the repository root.'
-              exit 1
-            fi
+          # Always prefer the supplied complete project ZIP. The repository may
+          # already contain an older app/ folder, which must not silently win.
+          ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*HisabYar*Offline*.zip' -print -quit)"
+          if [[ -n "$ZIP_FILE" ]]; then
+            echo "Using complete project ZIP: $ZIP_FILE"
+            rm -rf /tmp/hisabyar-source
             mkdir -p /tmp/hisabyar-source
             unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
             PROJECT_ROOT="$(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print -quit | sed 's#/app/build.gradle$##')"
-            if [[ -z "$PROJECT_ROOT" ]]; then echo 'ZIP does not contain app/build.gradle'; exit 1; fi
+            if [[ -z "$PROJECT_ROOT" ]]; then echo '::error::ZIP does not contain app/build.gradle'; exit 1; fi
+            # Replace stale project files with the complete project from the ZIP.
             cp -a "$PROJECT_ROOT"/. .
+          elif [[ ! -f app/build.gradle ]]; then
+            echo '::error::Project source missing. Upload the complete HisabYar offline ZIP to the repository root.'
+            exit 1
+          else
+            echo 'No project ZIP found; using repository source.'
           fi
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
+          echo "Source version line: $(grep -n 'versionName' app/build.gradle | head -1)"
           echo 'Project source prepared.'
 
       - name: Set up Java 17
