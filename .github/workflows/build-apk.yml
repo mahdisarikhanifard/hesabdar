@@ -1,4 +1,4 @@
-name: Build HisabYar Pro Offline Voice APK
+name: Build HisabYar Pro Offline v1.5.9
 
 on:
   workflow_dispatch:
@@ -10,167 +10,61 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify HisabYar Pro with embedded Persian offline speech model
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
-
-      - name: Install Android SDK packages
+      - name: Install SDK packages
         run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Extract HisabYar source
+      - name: Download and bundle official Persian OCR model
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="HisabYar_Pro_Offline_v1.5.8.zip"
-          if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
-            echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
-            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
-            exit 1
-          fi
-          mkdir -p "$GITHUB_WORKSPACE/source"
-          unzip -q "$GITHUB_WORKSPACE/$ZIP_FILE" -d "$GITHUB_WORKSPACE/source"
-          SETTINGS="$(find "$GITHUB_WORKSPACE/source" -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
-          if [ -z "$SETTINGS" ]; then
-            echo "::error::فایل تنظیمات Gradle داخل ZIP پیدا نشد."
-            exit 1
-          fi
-          PROJECT_DIR="$(dirname "$SETTINGS")"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project directory: $PROJECT_DIR"
-
-      - name: Validate app source and offline policy
-        working-directory: ${{ env.PROJECT_DIR }}
+          mkdir -p app/src/main/assets/tessdata
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://github.com/tesseract-ocr/tessdata_fast/raw/refs/heads/main/fas.traineddata" \
+            -o app/src/main/assets/tessdata/fas.traineddata
+          test "$(stat -c%s app/src/main/assets/tessdata/fas.traineddata)" -gt 100000
+          echo "Persian OCR model size: $(du -h app/src/main/assets/tessdata/fas.traineddata | cut -f1)"
+      - name: Validate source and offline OCR
         shell: bash
         run: |
           set -euo pipefail
-          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
-          test -s app/src/main/AndroidManifest.xml
-          grep -q "versionName '1.5.8-Pro'" app/build.gradle
-          grep -Fq 'String[][] tabs = {{"خانه", "⌂"}, {"تراکنش‌ها", "↕"}, {"دستیار صوتی", ""}, {"ثبت", "＋"}, {"تنظیمات", "☰"}}' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'createAutomaticBackup()' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'HisabYar_auto_' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q "versionName '1.5.9-Pro'" app/build.gradle
+          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle
+          grep -q 'TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'fas.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
-            echo "::error::این برنامه باید کاملاً آفلاین بماند."
-            exit 1
+            echo 'App must not request Internet permission.'; exit 1
           fi
-          grep -q 'recurring' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'current_amount' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'transfer_id' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'PRAGMA integrity_check' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'exportTransactionsCsv' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'payment_method' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'bank_name' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'lastCuePosition' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'processVoiceCommand' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'CREATE TABLE cheques' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'REQ_CHEQUE_IMAGE' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'REQ_CHEQUE_EXPORT' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'buildChequeCsv' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'تاریخ: قدیمی به جدید' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'showChequeDialog' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'financial_posted' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'handleVoiceBookSwitch' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'activateVoiceBook' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'showVoiceCommandHelp' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'matchExistingVoiceCategory' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'bankAliases' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'isQuickIconManagementCommand' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'routeVoiceCommandAcrossApp' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'showVoiceAccountPicker' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'return 0;' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'closed_months' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'showAccountTransactions' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'account_uid' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'manageAccountLinks' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'دفتر:' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'month_key' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'org.vosk.android.SpeechService' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'android.permission.RECORD_AUDIO' app/src/main/AndroidManifest.xml
-
-      - name: Cache Persian Vosk model to reduce repeat downloads
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.PROJECT_DIR }}/app/src/main/assets/model-fa
-          key: vosk-model-small-fa-0.42-fa-v1
-
-      - name: Download and bundle Persian offline speech model
-        working-directory: ${{ env.PROJECT_DIR }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p app/src/main/assets
-          if [ ! -s app/src/main/assets/model-fa/conf/model.conf ] || [ ! -s app/src/main/assets/model-fa/am/final.mdl ]; then
-            echo "Cached model missing or incomplete; downloading model only because cache is unavailable."
-            rm -rf app/src/main/assets/model-fa /tmp/vosk-fa
-            mkdir -p /tmp/vosk-fa
-            curl --fail --location --retry 3 --retry-delay 2 \
-              "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip" \
-              -o /tmp/vosk-model-fa.zip
-            unzip -q /tmp/vosk-model-fa.zip -d /tmp/vosk-fa
-            MODEL_DIR="$(find /tmp/vosk-fa -mindepth 1 -maxdepth 1 -type d -name 'vosk-model-small-fa-0.42' -print -quit)"
-            test -n "$MODEL_DIR"
-            mv "$MODEL_DIR" app/src/main/assets/model-fa
-          else
-            echo "Using cached Persian Vosk model; skipping model download."
-          fi
-          test -s app/src/main/assets/model-fa/conf/model.conf
-          test -s app/src/main/assets/model-fa/am/final.mdl
-          test -d app/src/main/assets/model-fa/am
-          test -d app/src/main/assets/model-fa/graph
-          test -d app/src/main/assets/model-fa/conf
-          # Vosk StorageService.unpack opens assets/model-fa/uuid before copying the model.
-          # The upstream model archive does not include this marker, so create it explicitly.
-          printf '%s\n' 'c0a6e9f1-5f30-4e31-9b6d-0f1a5b7c1500' > app/src/main/assets/model-fa/uuid
-          test -s app/src/main/assets/model-fa/uuid
-          echo "Vosk UUID marker created: $(cat app/src/main/assets/model-fa/uuid)"
-          echo "Model file count: $(find app/src/main/assets/model-fa -type f | wc -l)"
-          echo "Model files validated. Bundled Persian Vosk model: $(du -sh app/src/main/assets/model-fa | cut -f1)"
-          find app/src/main/assets/model-fa -maxdepth 2 -type f | head -30
-
-      - name: Build debug APK
-        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Build APK
         run: gradle --no-daemon clean assembleDebug --stacktrace
-
-      - name: Verify APK exists
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: test -s app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Verify model files are actually embedded in APK
-        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Verify APK and bundled OCR model
         shell: bash
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          unzip -l "$APK" | grep -F 'assets/model-fa/conf/model.conf'
-          unzip -l "$APK" | grep -F 'assets/model-fa/am/final.mdl'
-          unzip -l "$APK" | grep -F 'assets/model-fa/uuid'
-          COUNT="$(unzip -l "$APK" | grep -c 'assets/model-fa/' || true)"
-          echo "Embedded model asset entries in APK: $COUNT"
-          if [ "$COUNT" -lt 10 ]; then echo "::error::Too few Vosk model files embedded in APK"; exit 1; fi
-
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -F 'assets/tessdata/fas.traineddata'
+          unzip -p "$APK" assets/tessdata/fas.traineddata | wc -c | awk '$1 > 100000 {ok=1} END {exit !ok}'
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-Voice-v1.5.8-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          name: HisabYar-Pro-Offline-v1.5.9-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
