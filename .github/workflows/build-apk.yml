@@ -1,4 +1,4 @@
-name: Build HisabYar Pro Offline v1.6.2
+name: Build HisabYar Pro Offline v1.6.3
 
 on:
   workflow_dispatch:
@@ -21,10 +21,10 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! -f app/build.gradle ]]; then
-            ZIP_FILE="./HisabYar_Pro_Offline_v1.6.2_OCR_Image_Fixed.zip"
+            ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR.zip"
             if [[ ! -s "$ZIP_FILE" ]]; then
               echo "::error::Missing exact source ZIP: $ZIP_FILE"
-              echo 'Upload HisabYar_Pro_Offline_v1.6.2_OCR_Image_Fixed.zip to the repository root.'
+              echo 'Upload HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR.zip to the repository root.'
               find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
               exit 1
             fi
@@ -84,7 +84,7 @@ jobs:
           EOF
           fi
           if [[ ! -s "$MODEL_DIR/uuid" ]]; then
-            printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.6.2' > "$MODEL_DIR/uuid"
+            printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.6.3' > "$MODEL_DIR/uuid"
           fi
           test -s "$MODEL_DIR/am/final.mdl"
           test -s "$MODEL_DIR/conf/model.conf"
@@ -116,7 +116,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "versionName '1.6.2-Pro'" app/build.gradle
+          grep -q "versionName '1.6.3-Pro'" app/build.gradle
           grep -q "cz.adaptech.tesseract4android:tesseract4android:4.9.0" app/build.gradle
           grep -q 'TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'OEM_LSTM_ONLY' app/src/main/java/com/example/hisabyar/MainActivity.java
@@ -151,7 +151,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-v1.6.2-APK
+          name: HisabYar-Pro-Offline-v1.6.3-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
