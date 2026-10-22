@@ -1,15 +1,53 @@
-      - name: Prepare project source
+name: Build HisabYar Pro Offline APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hisabyar-pro-offline-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build HisabYar Pro 1.6.0-Pro
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show repository files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo
+          echo "ZIP files found in repository:"
+          find . -maxdepth 3 -type f -iname '*.zip' -print | sort
+
+      - name: Prepare exact version 1.6.0 source
         shell: bash
         run: |
           set -euo pipefail
 
           ZIP_FILE="./HisabYar_Pro_Offline_v1.6.0_Voice_OCR_Fixed.zip"
 
-          echo "Checking exact project ZIP..."
+          echo "Checking required project ZIP..."
 
           if [[ ! -f "$ZIP_FILE" ]]; then
-            echo "::error::Version 1.6.0 ZIP not found."
-            find . -maxdepth 2 -type f -iname '*1.6.0*.zip' -print || true
+            echo "::error::Required ZIP file not found: $ZIP_FILE"
+            echo "Available ZIP files:"
+            find . -maxdepth 3 -type f -iname '*.zip' -print | sort
             exit 1
           fi
 
@@ -20,40 +58,162 @@
 
           unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
 
-          PROJECT_ROOT="$(
+          echo "Searching for app/build.gradle..."
+
+          mapfile -t GRADLE_FILES < <(
             find /tmp/hisabyar-source \
               -type f \
               -path '*/app/build.gradle' \
-              -print -quit |
-              sed 's#/app/build.gradle$##'
-          )"
+              -print
+          )
 
-          if [[ -z "$PROJECT_ROOT" ]]; then
-            echo "::error::app/build.gradle not found inside ZIP."
+          if [[ "${#GRADLE_FILES[@]}" -eq 0 ]]; then
+            echo "::error::No app/build.gradle found inside the ZIP."
             exit 1
           fi
+
+          if [[ "${#GRADLE_FILES[@]}" -gt 1 ]]; then
+            echo "::error::Multiple app/build.gradle files found. Cannot safely choose the project."
+            printf '%s\n' "${GRADLE_FILES[@]}"
+            exit 1
+          fi
+
+          GRADLE_FILE="${GRADLE_FILES[0]}"
+          PROJECT_ROOT="${GRADLE_FILE%/app/build.gradle}"
 
           echo "Project root: $PROJECT_ROOT"
+          echo
+          echo "Checking app/build.gradle..."
 
-          grep -n 'versionName' "$PROJECT_ROOT/app/build.gradle"
+          grep -n 'versionName' "$GRADLE_FILE" || true
 
-          if ! grep -q "versionName '1.6.0-Pro'" \
-            "$PROJECT_ROOT/app/build.gradle"; then
-            echo "::error::The selected ZIP is not version 1.6.0-Pro."
+          if ! grep -Eq "versionName[[:space:]]+['\"]1\.6\.0-Pro['\"]" "$GRADLE_FILE"; then
+            echo "::error::The ZIP does not declare versionName 1.6.0-Pro."
             exit 1
           fi
 
-          if ! grep -q "com.rmtheis:tess-two:9.1.0" \
-            "$PROJECT_ROOT/app/build.gradle"; then
-            echo "::error::Tesseract dependency is missing."
+          if ! grep -Fq "com.rmtheis:tess-two:9.1.0" "$GRADLE_FILE"; then
+            echo "::error::Expected Tesseract dependency tess-two:9.1.0 was not found."
             exit 1
           fi
+
+          if [[ ! -f "$PROJECT_ROOT/gradlew" ]]; then
+            echo "::error::gradlew not found in the extracted project."
+            exit 1
+          fi
+
+          if [[ ! -f "$PROJECT_ROOT/app/src/main/AndroidManifest.xml" ]]; then
+            echo "::error::AndroidManifest.xml not found."
+            exit 1
+          fi
+
+          echo "Preparing project files..."
+
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name '.git' \
+            ! -name '.github' \
+            -exec rm -rf {} +
 
           cp -a "$PROJECT_ROOT"/. .
 
-          echo "Extracted project version:"
+          chmod +x gradlew
+
+          echo
+          echo "Final project version:"
           grep -n 'versionName' app/build.gradle
 
-          grep -q "versionName '1.6.0-Pro'" app/build.gradle
+          grep -Eq "versionName[[:space:]]+['\"]1\.6\.0-Pro['\"]" app/build.gradle
 
-          echo "Correct project source prepared."
+          echo
+          echo "Project source prepared successfully."
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager --licenses
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Verify offline app configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Checking project files..."
+
+          test -f app/build.gradle
+          test -f app/src/main/AndroidManifest.xml
+
+          echo "Checking INTERNET permission..."
+
+          if grep -Eq \
+            'android\.permission\.INTERNET' \
+            app/src/main/AndroidManifest.xml; then
+            echo "::error::INTERNET permission found in AndroidManifest.xml. This app is intended to be offline."
+            exit 1
+          fi
+
+          echo "No INTERNET permission found in the manifest."
+
+          echo
+          echo "Checking voice model and OCR assets..."
+
+          find app/src/main -type f \
+            \( -iname '*traineddata*' -o -iname '*vosk*' -o -iname '*.zip' \) \
+            -print || true
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ./gradlew \
+            --no-daemon \
+            --stacktrace \
+            clean \
+            assembleDebug
+
+      - name: Verify APK output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [[ ! -f "$APK_PATH" ]]; then
+            echo "::error::APK was not generated."
+            echo "Available APK files:"
+            find app/build/outputs -type f -name '*.apk' -print || true
+            exit 1
+          fi
+
+          echo "APK generated successfully:"
+          ls -lh "$APK_PATH"
+
+          mkdir -p release
+
+          cp "$APK_PATH" \
+            "release/HisabYar_Pro_Offline_v1.6.0-Pro.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HisabYar-Pro-Offline-v1.6.0
+          path: release/HisabYar_Pro_Offline_v1.6.0-Pro.apk
+          if-no-files-found: error
+          retention-days: 14
