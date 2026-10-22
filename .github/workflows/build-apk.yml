@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="HisabYar_Pro_Offline_v1.5.7.zip"
+          ZIP_FILE="HisabYar_Pro_Offline_v1.5.8.zip"
           if [ ! -s "$GITHUB_WORKSPACE/$ZIP_FILE" ]; then
             echo "::error::فایل $ZIP_FILE در ریشه مخزن پیدا نشد."
             find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -iname '*.zip' -print || true
@@ -64,8 +64,8 @@ jobs:
           set -euo pipefail
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
-          grep -q "versionName '1.5.7-Pro'" app/build.gradle
-          grep -q 'String\[\]\[\] tabs = {{"خانه", "⌂"}, {"تراکنش‌ها", "↕"}, {"دستیار صوتی", ""}, {"ثبت", "＋"}' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q "versionName '1.5.8-Pro'" app/build.gradle
+          grep -Fq 'String[][] tabs = {{"خانه", "⌂"}, {"تراکنش‌ها", "↕"}, {"دستیار صوتی", ""}, {"ثبت", "＋"}, {"تنظیمات", "☰"}}' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'createAutomaticBackup()' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'HisabYar_auto_' app/src/main/java/com/example/hisabyar/MainActivity.java
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
@@ -83,6 +83,9 @@ jobs:
           grep -q 'processVoiceCommand' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'CREATE TABLE cheques' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'REQ_CHEQUE_IMAGE' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'REQ_CHEQUE_EXPORT' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'buildChequeCsv' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'تاریخ: قدیمی به جدید' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'showChequeDialog' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'financial_posted' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'handleVoiceBookSwitch' app/src/main/java/com/example/hisabyar/MainActivity.java
@@ -167,7 +170,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-Voice-v1.5.7-APK
+          name: HisabYar-Pro-Offline-Voice-v1.5.8-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
