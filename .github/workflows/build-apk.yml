@@ -20,28 +20,41 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Always prefer the supplied complete project ZIP. The repository may
-          # already contain an older app/ folder, which must not silently win.
-          ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*HisabYar*Offline*.zip' -print -quit)"
-          if [[ -n "$ZIP_FILE" ]]; then
-            echo "Using complete project ZIP: $ZIP_FILE"
-            rm -rf /tmp/hisabyar-source
-            mkdir -p /tmp/hisabyar-source
-            unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
-            PROJECT_ROOT="$(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print -quit | sed 's#/app/build.gradle$##')"
-            if [[ -z "$PROJECT_ROOT" ]]; then echo '::error::ZIP does not contain app/build.gradle'; exit 1; fi
-            # Replace stale project files with the complete project from the ZIP.
-            cp -a "$PROJECT_ROOT"/. .
-          elif [[ ! -f app/build.gradle ]]; then
-            echo '::error::Project source missing. Upload the complete HisabYar offline ZIP to the repository root.'
+          echo "Repository files matching ZIPs:"
+          find . -type f -iname '*.zip' -print || true
+          ZIP_FILE="$(find . -type f -iname '*HisabYar*Offline*.zip' -print -quit)"
+          if [[ -z "$ZIP_FILE" ]]; then
+            echo '::error::No HisabYar Offline ZIP found anywhere in the repository. Upload HisabYar_Pro_Offline_v1.6.0_Voice_OCR_Fixed.zip to the repository.'
             exit 1
-          else
-            echo 'No project ZIP found; using repository source.'
           fi
+          echo "Using complete project ZIP: $ZIP_FILE"
+          rm -rf /tmp/hisabyar-source
+          mkdir -p /tmp/hisabyar-source
+          unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
+          PROJECT_ROOT="$(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print -quit | sed 's#/app/build.gradle$##')"
+          if [[ -z "$PROJECT_ROOT" ]]; then
+            echo '::error::ZIP does not contain app/build.gradle'
+            unzip -l "$ZIP_FILE" | head -80
+            exit 1
+          fi
+          echo "Project root inside ZIP: $PROJECT_ROOT"
+          echo 'Gradle version line inside ZIP:'
+          grep -n 'versionName' "$PROJECT_ROOT/app/build.gradle" || true
+          # Replace the repository's potentially stale source with the ZIP contents.
+          cp -a "$PROJECT_ROOT"/. .
+          echo 'Gradle version line after extraction:'
+          grep -n 'versionName' app/build.gradle || true
+          grep -q "versionName '1.6.0-Pro'" app/build.gradle || {
+            echo '::error::The ZIP was found, but its app/build.gradle does not declare versionName 1.6.0-Pro.'
+            exit 1
+          }
+          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle || {
+            echo '::error::The selected ZIP does not contain the required Tesseract dependency.'
+            exit 1
+          }
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
-          echo "Source version line: $(grep -n 'versionName' app/build.gradle | head -1)"
-          echo 'Project source prepared.'
+          echo 'Project source prepared successfully from ZIP.'
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
