@@ -65,12 +65,30 @@ jobs:
             -o /tmp/vosk-fa.zip
           mkdir -p /tmp/vosk-fa
           unzip -q /tmp/vosk-fa.zip -d /tmp/vosk-fa
-          MODEL_DIR="$(find /tmp/vosk-fa -mindepth 1 -maxdepth 1 -type d -print -quit)"
-          test -n "$MODEL_DIR"
-          test -s "$MODEL_DIR/uuid"
+          MODEL_DIR="$(find /tmp/vosk-fa -type f -path '*/am/final.mdl' -print -quit | sed 's#/am/final.mdl$##')"
+          if [[ -z "$MODEL_DIR" ]]; then
+            echo '::error::فایل اصلی مدل Vosk یعنی am/final.mdl در ZIP پیدا نشد.'
+            find /tmp/vosk-fa -maxdepth 3 -type f | head -80
+            exit 1
+          fi
+          # Some official model archives omit metadata files expected by
+          # Vosk Android StorageService. Supply them when absent.
+          mkdir -p "$MODEL_DIR/conf"
+          if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
+            cat > "$MODEL_DIR/conf/model.conf" <<'EOF'
+          --beam=13.0
+          --lattice-beam=6.0
+          EOF
+          fi
+          if [[ ! -s "$MODEL_DIR/uuid" ]]; then
+            printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.6.0' > "$MODEL_DIR/uuid"
+          fi
+          test -s "$MODEL_DIR/am/final.mdl"
           test -s "$MODEL_DIR/conf/model.conf"
+          test -s "$MODEL_DIR/uuid"
           rm -rf app/src/main/assets/model-fa
           cp -a "$MODEL_DIR" app/src/main/assets/model-fa
+          test -s app/src/main/assets/model-fa/am/final.mdl
           test -s app/src/main/assets/model-fa/uuid
           test -s app/src/main/assets/model-fa/conf/model.conf
           echo "Vosk Persian model bundled: $(du -sh app/src/main/assets/model-fa | cut -f1)"
