@@ -21,9 +21,9 @@ jobs:
         run: |
           set -euo pipefail
           # Prefer the exact v1.6.1 source ZIP. Never select an older ZIP by wildcard.
-          ZIP_FILE="./HisabYar_Pro_Offline_v1.6.1_Source.zip"
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.6.1_OCR_Engine_Fixed.zip"
           if [[ ! -f "$ZIP_FILE" ]]; then
-            echo "::error::Missing $ZIP_FILE. Upload the complete v1.6.1 source ZIP to the repository root, or upload the extracted project files."
+            echo "::error::Missing $ZIP_FILE. This workflow expects the exact OCR Engine Fixed ZIP already used by this repository."
             echo "ZIP files found in repository root:"
             find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
             exit 1
