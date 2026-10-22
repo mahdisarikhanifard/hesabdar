@@ -113,18 +113,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "versionName '1.6.0-Pro'" app/build.gradle
-          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle
-          grep -q 'TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'tessdata/fas.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -q 'tessdata/eng.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
-          test -s app/src/main/assets/model-fa/uuid
-          test -s app/src/main/assets/model-fa/conf/model.conf
-          test -s app/src/main/assets/tessdata/fas.traineddata
-          test -s app/src/main/assets/tessdata/eng.traineddata
+          fail() { echo "::error::$1"; exit 1; }
+          echo 'Checking app source and version...'
+          grep -q "versionName '1.6.0-Pro'" app/build.gradle || fail "app/build.gradle does not declare versionName 1.6.0-Pro"
+          grep -q "com.rmtheis:tess-two:9.1.0" app/build.gradle || fail "Tesseract dependency com.rmtheis:tess-two:9.1.0 is missing"
+          MAIN=app/src/main/java/com/example/hisabyar/MainActivity.java
+          test -s "$MAIN" || fail "MainActivity.java not found at expected path: $MAIN"
+          grep -q 'TessBaseAPI' "$MAIN" || fail 'MainActivity does not use TessBaseAPI'
+          grep -q 'tessdata/fas.traineddata' "$MAIN" || fail 'MainActivity does not load the Persian OCR model'
+          grep -q 'tessdata/eng.traineddata' "$MAIN" || fail 'MainActivity does not load the English OCR model'
+          echo 'Checking downloaded Vosk assets...'
+          for f in app/src/main/assets/model-fa/am/final.mdl app/src/main/assets/model-fa/uuid app/src/main/assets/model-fa/conf/model.conf; do
+            if [[ ! -s "$f" ]]; then echo '::error::Missing or empty required Vosk asset:' "$f"; find app/src/main/assets/model-fa -maxdepth 4 -type f -printf '%p (%s bytes)\n' 2>/dev/null || true; exit 1; fi
+          done
+          echo 'Checking downloaded OCR assets...'
+          for f in app/src/main/assets/tessdata/fas.traineddata app/src/main/assets/tessdata/eng.traineddata; do
+            if [[ ! -s "$f" ]]; then echo '::error::Missing or empty OCR model:' "$f"; find app/src/main/assets -maxdepth 4 -type f -printf '%p (%s bytes)\n' 2>/dev/null || true; exit 1; fi
+            size=$(stat -c%s "$f")
+            if [[ "$size" -le 100000 ]]; then fail "OCR model is too small or invalid: $f ($size bytes)"; fi
+          done
+          echo 'Checking that app does not request Internet permission...'
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
-            echo 'App must not request Internet permission.'; exit 1
+            fail 'App must not request Internet permission.'
           fi
+          echo 'All source, model, and offline-policy checks passed.'
 
       - name: Build APK
         run: gradle --no-daemon clean assembleDebug --stacktrace
