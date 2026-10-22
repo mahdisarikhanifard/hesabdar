@@ -1,92 +1,154 @@
-      - name: Prepare exact version 1.6.0 source
+name: Build HisabYar Pro Offline v1.6.1
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare project source
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -f app/build.gradle ]]; then
+            ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*HisabYar*Offline*.zip' -print -quit)"
+            if [[ -z "$ZIP_FILE" ]]; then
+              echo 'Project source missing. Upload the complete HisabYar offline ZIP to the repository root.'
+              exit 1
+            fi
+            mkdir -p /tmp/hisabyar-source
+            unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
+            PROJECT_ROOT="$(find /tmp/hisabyar-source -type f -path '*/app/build.gradle' -print -quit | sed 's#/app/build.gradle$##')"
+            if [[ -z "$PROJECT_ROOT" ]]; then echo 'ZIP does not contain app/build.gradle'; exit 1; fi
+            cp -a "$PROJECT_ROOT"/. .
+          fi
+          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
+          test -s app/src/main/AndroidManifest.xml
+          echo 'Project source prepared.'
 
-          ZIP_FILE="./HisabYar_Pro_Offline_v1.6.0_Voice_OCR_Fixed.zip"
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-          if [[ ! -f "$ZIP_FILE" ]]; then
-            echo "::error::ZIP file not found: $ZIP_FILE"
-            find . -maxdepth 3 -type f -iname '*.zip' -print
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Install SDK packages
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Download and bundle Persian offline speech model
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets
+          curl --fail --location --retry 3 --retry-delay 2 \
+            'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip' \
+            -o /tmp/vosk-fa.zip
+          mkdir -p /tmp/vosk-fa
+          unzip -q /tmp/vosk-fa.zip -d /tmp/vosk-fa
+          MODEL_DIR="$(find /tmp/vosk-fa -type f -path '*/am/final.mdl' -print -quit | sed 's#/am/final.mdl$##')"
+          if [[ -z "$MODEL_DIR" ]]; then
+            echo '::error::فایل اصلی مدل Vosk یعنی am/final.mdl در ZIP پیدا نشد.'
+            find /tmp/vosk-fa -maxdepth 3 -type f | head -80
             exit 1
           fi
+          # Some official model archives omit metadata files expected by
+          # Vosk Android StorageService. Supply them when absent.
+          mkdir -p "$MODEL_DIR/conf"
+          if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
+            cat > "$MODEL_DIR/conf/model.conf" <<'EOF'
+          --beam=13.0
+          --lattice-beam=6.0
+          EOF
+          fi
+          if [[ ! -s "$MODEL_DIR/uuid" ]]; then
+            printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.6.0' > "$MODEL_DIR/uuid"
+          fi
+          test -s "$MODEL_DIR/am/final.mdl"
+          test -s "$MODEL_DIR/conf/model.conf"
+          test -s "$MODEL_DIR/uuid"
+          rm -rf app/src/main/assets/model-fa
+          cp -a "$MODEL_DIR" app/src/main/assets/model-fa
+          test -s app/src/main/assets/model-fa/am/final.mdl
+          test -s app/src/main/assets/model-fa/uuid
+          test -s app/src/main/assets/model-fa/conf/model.conf
+          echo "Vosk Persian model bundled: $(du -sh app/src/main/assets/model-fa | cut -f1)"
 
-          echo "Using exact ZIP: $ZIP_FILE"
+      - name: Download and bundle Persian and English OCR models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/tessdata
+          curl --fail --location --retry 3 --retry-delay 2 \
+            'https://github.com/tesseract-ocr/tessdata_fast/raw/refs/heads/main/fas.traineddata' \
+            -o app/src/main/assets/tessdata/fas.traineddata
+          curl --fail --location --retry 3 --retry-delay 2 \
+            'https://github.com/tesseract-ocr/tessdata_fast/raw/refs/heads/main/eng.traineddata' \
+            -o app/src/main/assets/tessdata/eng.traineddata
+          test "$(stat -c%s app/src/main/assets/tessdata/fas.traineddata)" -gt 100000
+          test "$(stat -c%s app/src/main/assets/tessdata/eng.traineddata)" -gt 100000
+          echo 'OCR models bundled:'
+          du -h app/src/main/assets/tessdata/*.traineddata
 
-          rm -rf /tmp/hisabyar-source
-          mkdir -p /tmp/hisabyar-source
-
-          unzip -q "$ZIP_FILE" -d /tmp/hisabyar-source
-
-          echo "ZIP directory structure:"
-          find /tmp/hisabyar-source -maxdepth 4 -type f \
-            \( -name 'build.gradle' \
-            -o -name 'build.gradle.kts' \
-            -o -name 'settings.gradle' \
-            -o -name 'settings.gradle.kts' \
-            -o -name 'gradlew' \
-            -o -name 'gradle-wrapper.properties' \
-            -o -name 'AndroidManifest.xml' \) -print | sort
-
-          mapfile -t GRADLE_FILES < <(
-            find /tmp/hisabyar-source \
-              -type f \
-              -path '*/app/build.gradle' \
-              -print
-          )
-
-          if [[ "${#GRADLE_FILES[@]}" -ne 1 ]]; then
-            echo "::error::Expected exactly one app/build.gradle file."
-            printf '%s\n' "${GRADLE_FILES[@]}"
-            exit 1
+      - name: Validate source, model files, and offline policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "versionName '1.6.1-Pro'" app/build.gradle
+          grep -q "cz.adaptech.tesseract4android:tesseract4android:4.9.0" app/build.gradle
+          grep -q 'TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'OEM_LSTM_ONLY' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'jitpack.io' settings.gradle
+          grep -q 'tessdata/fas.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'tessdata/eng.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
+          test -s app/src/main/assets/model-fa/uuid
+          test -s app/src/main/assets/model-fa/conf/model.conf
+          test -s app/src/main/assets/tessdata/fas.traineddata
+          test -s app/src/main/assets/tessdata/eng.traineddata
+          if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
+            echo 'App must not request Internet permission.'; exit 1
           fi
 
-          GRADLE_FILE="${GRADLE_FILES[0]}"
-          PROJECT_ROOT="${GRADLE_FILE%/app/build.gradle}"
+      - name: Build APK
+        run: gradle --no-daemon clean assembleDebug --stacktrace
 
-          echo "Detected project root: $PROJECT_ROOT"
-          echo "Detected version:"
-          grep -n 'versionName' "$GRADLE_FILE"
+      - name: Verify models are embedded in APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -F 'assets/model-fa/uuid'
+          unzip -l "$APK" | grep -F 'assets/model-fa/conf/model.conf'
+          unzip -l "$APK" | grep -F 'assets/tessdata/fas.traineddata'
+          unzip -l "$APK" | grep -F 'assets/tessdata/eng.traineddata'
+          unzip -p "$APK" assets/tessdata/fas.traineddata | wc -c | awk '$1 > 100000 {ok=1} END {exit !ok}'
+          unzip -p "$APK" assets/tessdata/eng.traineddata | wc -c | awk '$1 > 100000 {ok=1} END {exit !ok}'
+          echo "APK size: $(du -h "$APK" | cut -f1)"
 
-          if ! grep -Eq "versionName[[:space:]]+['\"]1\.6\.0-Pro['\"]" "$GRADLE_FILE"; then
-            echo "::error::Incorrect project version."
-            exit 1
-          fi
-
-          if ! grep -Fq "com.rmtheis:tess-two:9.1.0" "$GRADLE_FILE"; then
-            echo "::error::Expected tess-two:9.1.0 dependency not found."
-            exit 1
-          fi
-
-          if [[ ! -f "$PROJECT_ROOT/app/src/main/AndroidManifest.xml" ]]; then
-            echo "::error::AndroidManifest.xml not found."
-            exit 1
-          fi
-
-          if [[ ! -f "$PROJECT_ROOT/settings.gradle" && ! -f "$PROJECT_ROOT/settings.gradle.kts" ]]; then
-            echo "::error::Gradle settings file not found in project root."
-            exit 1
-          fi
-
-          if [[ ! -f "$PROJECT_ROOT/gradlew" ]]; then
-            echo "::error::The ZIP does not contain gradlew in the detected project root."
-            echo "Checking whether a wrapper exists elsewhere in the ZIP..."
-            find /tmp/hisabyar-source -type f \
-              \( -name 'gradlew' -o -name 'gradle-wrapper.jar' \) -print
-            echo "::error::The workflow cannot safely assume a Gradle wrapper exists. The ZIP structure must be checked."
-            exit 1
-          fi
-
-          find . -mindepth 1 -maxdepth 1 \
-            ! -name '.git' \
-            ! -name '.github' \
-            -exec rm -rf {} +
-
-          cp -a "$PROJECT_ROOT"/. .
-
-          chmod +x gradlew
-
-          echo "Final project version:"
-          grep -n 'versionName' app/build.gradle
-
-          echo "Project source prepared successfully."
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HisabYar-Pro-Offline-v1.6.1-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
