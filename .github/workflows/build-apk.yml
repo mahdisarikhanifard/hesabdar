@@ -97,7 +97,7 @@ jobs:
           check "versionName 1.6.3-Pro" grep -q "versionName '1.6.3-Pro'" app/build.gradle
           check "versionCode 163" grep -qE 'versionCode[[:space:]]+163([[:space:]]|$)' app/build.gradle
           check "Tesseract dependency" grep -qF "cz.adaptech.tesseract4android:tesseract4android:4.9.0" app/build.gradle
-          check "TessBaseAPI in MainActivity" grep -qF 'TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "TessBaseAPI uses correct library package" grep -qF 'com.googlecode.tesseract.android.TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
           check "LSTM OCR mode" grep -qF 'OEM_LSTM_ONLY' app/src/main/java/com/example/hisabyar/MainActivity.java
           check "JitPack repository" grep -qF 'jitpack.io' settings.gradle
           check "Persian OCR path" grep -qF 'tessdata/fas.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
