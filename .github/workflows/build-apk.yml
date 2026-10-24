@@ -1,4 +1,4 @@
-name: Build HisabYar Pro Offline v1.6.3
+name: Build HisabYar Pro Offline v1.6.3 Validation Fixed
 on:
   workflow_dispatch:
   push:
@@ -18,7 +18,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! -f app/build.gradle ]]; then
-            ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR_FIXED.zip"
+            ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR_VALIDATION_FIXED.zip"
+            [[ -s "$ZIP_FILE" ]] || ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR_FIXED.zip"
             [[ -s "$ZIP_FILE" ]] || ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR.zip"
             if [[ ! -s "$ZIP_FILE" ]]; then
               echo "::error::Source ZIP missing from repository root."
