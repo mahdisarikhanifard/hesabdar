@@ -1,4 +1,4 @@
-name: Build HisabYar Pro Offline v1.6.3 Validation Fixed
+name: Build HisabYar Pro Offline v1.7.0
 on:
   workflow_dispatch:
   push:
@@ -18,9 +18,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! -f app/build.gradle ]]; then
-            ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR_VALIDATION_FIXED.zip"
-            [[ -s "$ZIP_FILE" ]] || ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR_FIXED.zip"
-            [[ -s "$ZIP_FILE" ]] || ZIP_FILE="./HisabYar_Pro_Offline_v1.6.3_SmartCheque_OCR.zip"
+            ZIP_FILE="./HisabYar_Pro_Offline_v1.7.0_Offline.zip"
+            [[ -s "$ZIP_FILE" ]] || ZIP_FILE="./HisabYar_Pro_Offline_v1.7.0_Offline.zip"
             if [[ ! -s "$ZIP_FILE" ]]; then
               echo "::error::Source ZIP missing from repository root."
               find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
@@ -67,24 +66,13 @@ jobs:
           if [[ -z "$MODEL_DIR" ]]; then echo "::error::Vosk am/final.mdl not found"; exit 1; fi
           mkdir -p "$MODEL_DIR/conf"
           [[ -s "$MODEL_DIR/conf/model.conf" ]] || printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
-          [[ -s "$MODEL_DIR/uuid" ]] || printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.6.3' > "$MODEL_DIR/uuid"
+          [[ -s "$MODEL_DIR/uuid" ]] || printf '%s\n' 'hisabyar-vosk-fa-0.42-v1.7.0' > "$MODEL_DIR/uuid"
           test -s "$MODEL_DIR/am/final.mdl"
           rm -rf app/src/main/assets/model-fa
           cp -a "$MODEL_DIR" app/src/main/assets/model-fa
           test -s app/src/main/assets/model-fa/uuid
           test -s app/src/main/assets/model-fa/conf/model.conf
           echo "Vosk model bundled: $(du -sh app/src/main/assets/model-fa | cut -f1)"
-
-      - name: Download and bundle Persian and English OCR models
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p app/src/main/assets/tessdata
-          curl --fail --location --retry 3 --retry-delay 2 'https://github.com/tesseract-ocr/tessdata_fast/raw/refs/heads/main/fas.traineddata' -o app/src/main/assets/tessdata/fas.traineddata
-          curl --fail --location --retry 3 --retry-delay 2 'https://github.com/tesseract-ocr/tessdata_fast/raw/refs/heads/main/eng.traineddata' -o app/src/main/assets/tessdata/eng.traineddata
-          test "$(stat -c%s app/src/main/assets/tessdata/fas.traineddata)" -gt 100000
-          test "$(stat -c%s app/src/main/assets/tessdata/eng.traineddata)" -gt 100000
-          du -h app/src/main/assets/tessdata/*.traineddata
 
       - name: Validate source, models, and offline policy
         shell: bash
@@ -95,22 +83,21 @@ jobs:
             if ! "$@"; then echo "::error::Validation failed: $label"; exit 1; fi
             echo "PASS: $label"
           }
-          check "versionName 1.6.3-Pro" grep -q "versionName '1.6.3-Pro'" app/build.gradle
-          check "versionCode 163" grep -qE 'versionCode[[:space:]]+163([[:space:]]|$)' app/build.gradle
-          check "Tesseract dependency" grep -qF "cz.adaptech.tesseract4android:tesseract4android:4.9.0" app/build.gradle
-          check "TessBaseAPI uses correct library package" grep -qF 'com.googlecode.tesseract.android.TessBaseAPI' app/src/main/java/com/example/hisabyar/MainActivity.java
-          check "LSTM OCR mode" grep -qF 'OEM_LSTM_ONLY' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "versionName 1.7.0-Pro" grep -q "versionName '1.7.0-Pro'" app/build.gradle
+          check "versionCode 170" grep -qE 'versionCode[[:space:]]+170([[:space:]]|$)' app/build.gradle
           check "JitPack repository" grep -qF 'jitpack.io' settings.gradle
-          check "Persian OCR path" grep -qF 'tessdata/fas.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
-          check "English OCR path" grep -qF 'tessdata/eng.traineddata' app/src/main/java/com/example/hisabyar/MainActivity.java
           check "Vosk UUID" test -s app/src/main/assets/model-fa/uuid
           check "Vosk model config" test -s app/src/main/assets/model-fa/conf/model.conf
-          check "Persian OCR model" test -s app/src/main/assets/tessdata/fas.traineddata
-          check "English OCR model" test -s app/src/main/assets/tessdata/eng.traineddata
           if grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml; then
             echo "::error::Internet permission found in offline app manifest"; exit 1
           fi
           echo "PASS: no Internet permission in manifest"
+          if grep -Eiq 'tesseract4android|TessBaseAPI|processChequeImage|REQ_CHEQUE_IMAGE' app/src/main/java/com/example/hisabyar/MainActivity.java app/build.gradle; then
+            echo "::error::OCR code/dependency unexpectedly present"; exit 1
+          fi
+          check "amount masking feature" grep -q 'hide_amounts' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "duplicate transaction warning" grep -q 'saveTransactionWithDuplicateWarning' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "PDF report action" grep -q 'printFinancialReport' app/src/main/java/com/example/hisabyar/MainActivity.java
 
       - name: Build APK
         run: gradle --no-daemon clean assembleDebug --stacktrace
@@ -121,18 +108,16 @@ jobs:
           set -euo pipefail
           APK=app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK" || { echo "::error::APK not produced"; exit 1; }
-          for asset in assets/model-fa/uuid assets/model-fa/conf/model.conf assets/tessdata/fas.traineddata assets/tessdata/eng.traineddata; do
+          for asset in assets/model-fa/uuid assets/model-fa/conf/model.conf; do
             unzip -l "$APK" | grep -F "$asset" >/dev/null || { echo "::error::APK missing $asset"; exit 1; }
             echo "PASS: APK contains $asset"
           done
-          unzip -p "$APK" assets/tessdata/fas.traineddata | wc -c | awk '$1 > 100000 {ok=1} END {exit !ok}'
-          unzip -p "$APK" assets/tessdata/eng.traineddata | wc -c | awk '$1 > 100000 {ok=1} END {exit !ok}'
           echo "APK size: $(du -h "$APK" | cut -f1)"
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-v1.6.3-APK
+          name: HisabYar-Pro-Offline-v1.7.0-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
