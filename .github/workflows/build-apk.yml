@@ -30,9 +30,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="./HisabYar_Pro_Offline_v1.7.5_BankImport_CLEAN.zip"
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.7.5_ExcelPDFImport.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
-            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.7.5*BankImport*.zip' -print -quit || true)"
+            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.7.5*ExcelPDFImport*.zip' -print -quit || true)"
           fi
           if [[ -z "${ZIP_FILE:-}" || ! -s "$ZIP_FILE" ]]; then
             echo "::error::Missing v1.7.5 source ZIP in repository root."
@@ -88,6 +88,11 @@ jobs:
           grep -qE 'versionCode[[:space:]]+175([[:space:]]|$)' app/build.gradle
           grep -qF "versionName '1.7.5-Pro'" app/build.gradle
           echo "Version 1.7.5-Pro (175) verified."
+          grep -qF "com.tom-roush:pdfbox-android:2.0.27.0" app/build.gradle
+          grep -q 'readXlsxRows' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'readTextFromPdf' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -q 'importStatementBytes' app/src/main/java/com/example/hisabyar/MainActivity.java
+          echo "Excel XLSX and text-based PDF import hooks verified."
 
       - name: Download and bundle Persian offline speech model
         shell: bash
