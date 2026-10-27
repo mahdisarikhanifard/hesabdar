@@ -30,9 +30,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="./HisabYar_Pro_Offline_v1.7.5_ExcelPDFImport_FIX1.zip"
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.7.5_ExcelPDFImport_FIX2.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
-            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.7.5*ExcelPDFImport*.zip' -print -quit || true)"
+            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.7.5*ExcelPDFImport*FIX2*.zip' -print -quit || true)"
           fi
           if [[ -z "${ZIP_FILE:-}" || ! -s "$ZIP_FILE" ]]; then
             echo "::error::Missing v1.7.5 source ZIP in repository root."
