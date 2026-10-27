@@ -1,4 +1,4 @@
-name: Build HisabYar Pro Offline v1.7.0
+name: Build HisabYar Pro Offline v1.7.5
 on:
   workflow_dispatch:
   push:
@@ -18,8 +18,10 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! -f app/build.gradle ]]; then
-            ZIP_FILE="./HisabYar_Pro_Offline_v1.7.0_Offline.zip"
-            [[ -s "$ZIP_FILE" ]] || ZIP_FILE="./HisabYar_Pro_Offline_v1.7.0_Offline.zip"
+            ZIP_FILE="./HisabYar_Pro_Offline_v1.7.5_BankImport.zip"
+            if [[ ! -s "$ZIP_FILE" ]]; then
+              ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.7.5*BankImport*.zip' -print -quit)"
+            fi
             if [[ ! -s "$ZIP_FILE" ]]; then
               echo "::error::Source ZIP missing from repository root."
               find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
@@ -83,8 +85,8 @@ jobs:
             if ! "$@"; then echo "::error::Validation failed: $label"; exit 1; fi
             echo "PASS: $label"
           }
-          check "versionName 1.7.0-Pro" grep -q "versionName '1.7.0-Pro'" app/build.gradle
-          check "versionCode 170" grep -qE 'versionCode[[:space:]]+170([[:space:]]|$)' app/build.gradle
+          check "versionName 1.7.4-Pro" grep -q "versionName '1.7.5-Pro'" app/build.gradle
+          check "versionCode 174" grep -qE 'versionCode[[:space:]]+174([[:space:]]|$)' app/build.gradle
           check "JitPack repository" grep -qF 'jitpack.io' settings.gradle
           check "Vosk UUID" test -s app/src/main/assets/model-fa/uuid
           check "Vosk model config" test -s app/src/main/assets/model-fa/conf/model.conf
@@ -98,6 +100,9 @@ jobs:
           check "amount masking feature" grep -q 'hide_amounts' app/src/main/java/com/example/hisabyar/MainActivity.java
           check "duplicate transaction warning" grep -q 'saveTransactionWithDuplicateWarning' app/src/main/java/com/example/hisabyar/MainActivity.java
           check "PDF report action" grep -q 'printFinancialReport' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "bank-first statement import" grep -q 'chooseBankForStatement' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "CSV quote-aware parser" grep -q 'parseCsvLine' app/src/main/java/com/example/hisabyar/MainActivity.java
+          check "bank description categorization" grep -q 'classifyBankExpense' app/src/main/java/com/example/hisabyar/MainActivity.java
 
       - name: Build APK
         run: gradle --no-daemon clean assembleDebug --stacktrace
@@ -117,7 +122,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-v1.7.0-APK
+          name: HisabYar-Pro-Offline-v1.7.5-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
