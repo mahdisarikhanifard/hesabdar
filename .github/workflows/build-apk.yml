@@ -1,4 +1,4 @@
-name: Build HisabYar Pro Offline v1.8.3
+name: Build HisabYar Pro Offline v1.8.4
 
 on:
   workflow_dispatch:
@@ -26,16 +26,16 @@ jobs:
         uses: actions/checkout@v4
 
       # Always use the ZIP source first. Do not build stale app/ files already in the repo.
-      - name: Extract v1.8.3 source ZIP
+      - name: Extract v1.8.4 source ZIP
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="./HisabYar_Pro_Offline_v1.8.3_DropdownEverywhere.zip"
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.8.4_DateFirst_BankImport.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
-            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.8.3*DropdownEverywhere*.zip' -print -quit || true)"
+            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.8.4*DateFirst*BankImport*.zip' -print -quit || true)"
           fi
           if [[ -z "${ZIP_FILE:-}" || ! -s "$ZIP_FILE" ]]; then
-            echo "::error::Missing v1.8.3 source ZIP in repository root."
+            echo "::error::Missing v1.8.4 source ZIP in repository root."
             find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
             exit 1
           fi
@@ -85,9 +85,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -qE 'versionCode[[:space:]]+183([[:space:]]|$)' app/build.gradle
-          grep -qF "versionName '1.8.3-Pro'" app/build.gradle
-          echo "Version 1.8.2-Pro (182) verified."
+          grep -qE 'versionCode[[:space:]]+184([[:space:]]|$)' app/build.gradle
+          grep -qF "versionName '1.8.4-Pro'" app/build.gradle
+          grep -qF 'private void importBackup()' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -qF 'انتخاب فایل دستی' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -qF 'HisabYar_auto_' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -qF 'PRAGMA integrity_check' app/src/main/java/com/example/hisabyar/MainActivity.java
+          echo "Version 1.8.4-Pro (184) verified."
           grep -qF "com.tom-roush:pdfbox-android:2.0.27.0" app/build.gradle
           grep -q 'readXlsxRows' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'readTextFromPdf' app/src/main/java/com/example/hisabyar/MainActivity.java
@@ -124,7 +128,7 @@ jobs:
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
           if [[ ! -s "$MODEL_DIR/uuid" ]]; then
-            printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.8.3' > "$MODEL_DIR/uuid"
+            printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.8.4' > "$MODEL_DIR/uuid"
           fi
           rm -rf app/src/main/assets/model-fa
           cp -a "$MODEL_DIR" app/src/main/assets/model-fa
@@ -150,7 +154,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-v1.8.3-DropdownEverywhere-APK
+          name: HisabYar-Pro-Offline-v1.8.4-DateFirst-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
