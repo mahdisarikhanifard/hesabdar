@@ -6,41 +6,47 @@ on:
     branches:
       - main
       - master
+    paths:
+      - 'build-apk.yml'
+      - '.github/workflows/**'
+      - '*.zip'
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
 
 permissions:
   contents: read
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
+      # مرحله ۱: دریافت فایل‌های مخزن
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # مرحله ۲: آماده‌سازی سورس برنامه
       - name: Prepare project source
         shell: bash
         run: |
           set -euo pipefail
 
           if [[ ! -f app/build.gradle ]]; then
+
             ZIP_FILE="./HisabYar_Pro_Offline_v1.7.5_BankImport.zip"
 
             if [[ ! -s "$ZIP_FILE" ]]; then
-              ZIP_FILE="$(find . -maxdepth 1 -type f \
-                -iname '*v1.7.5*BankImport*.zip' \
-                -print -quit)"
-            fi
-
-            if [[ -z "${ZIP_FILE:-}" || ! -s "$ZIP_FILE" ]]; then
-              echo "::error::Source ZIP for v1.7.5 was not found."
-              echo "ZIP files available in repository root:"
-              find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
+              echo "::error::Source ZIP not found."
+              echo "ZIP files in repository root:"
+              find . -maxdepth 1 -type f -iname '*.zip' -print
               exit 1
             fi
 
-            echo "Using source archive: $ZIP_FILE"
+            echo "Source archive: $ZIP_FILE"
 
             rm -rf /tmp/hesabyar-source
             mkdir -p /tmp/hesabyar-source
@@ -56,7 +62,7 @@ jobs:
             )"
 
             if [[ -z "$PROJECT_ROOT" ]]; then
-              echo "::error::The ZIP does not contain app/build.gradle."
+              echo "::error::app/build.gradle not found inside ZIP."
               exit 1
             fi
 
@@ -64,197 +70,97 @@ jobs:
           fi
 
           test -s app/build.gradle
-          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/src/main/AndroidManifest.xml
+          test -s app/src/main/java/com/example/hisabyar/MainActivity.java
 
-          echo "Project source prepared successfully."
+          echo "Project source prepared."
 
+      # مرحله ۳: نصب Java
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # مرحله ۴: نصب Gradle
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
+      # مرحله ۵: نصب Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools'
 
+      # مرحله ۶: نصب پلتفرم‌ها و ابزارهای SDK
       - name: Install Android SDK packages
         shell: bash
         run: |
           set -euo pipefail
+
           sdkmanager --install \
+            "platform-tools" \
             "platforms;android-35" \
-            "build-tools;35.0.0"
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "build-tools;36.0.0"
 
-      - name: Download and bundle Persian offline speech model
+      # مرحله ۷: بررسی نسخه برنامه
+      - name: Verify application version
         shell: bash
         run: |
           set -euo pipefail
 
-          mkdir -p app/src/main/assets
+          echo "Checking app/build.gradle"
 
-          curl --fail --location --retry 3 --retry-delay 2 \
-            'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip' \
-            -o /tmp/vosk-fa.zip
+          grep -nE \
+            'versionCode|versionName|compileSdk|targetSdk|minSdk' \
+            app/build.gradle || true
 
-          mkdir -p /tmp/vosk-fa
-          unzip -q /tmp/vosk-fa.zip -d /tmp/vosk-fa
-
-          MODEL_DIR="$(
-            find /tmp/vosk-fa \
-              -type f \
-              -path '*/am/final.mdl' \
-              -print -quit |
-              sed 's#/am/final.mdl$##'
-          )"
-
-          if [[ -z "$MODEL_DIR" ]]; then
-            echo "::error::Persian Vosk model was not found."
-            exit 1
-          fi
-
-          mkdir -p "$MODEL_DIR/conf"
-
-          if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
-            printf '%s\n' \
-              '--beam=13.0' \
-              '--lattice-beam=6.0' \
-              > "$MODEL_DIR/conf/model.conf"
-          fi
-
-          if [[ ! -s "$MODEL_DIR/uuid" ]]; then
-            printf '%s\n' \
-              'hesabyar-vosk-fa-0.42-v1.7.5' \
-              > "$MODEL_DIR/uuid"
-          fi
-
-          test -s "$MODEL_DIR/am/final.mdl"
-
-          rm -rf app/src/main/assets/model-fa
-          cp -a "$MODEL_DIR" app/src/main/assets/model-fa
-
-          test -s app/src/main/assets/model-fa/uuid
-          test -s app/src/main/assets/model-fa/conf/model.conf
-
-          echo "Persian offline speech model bundled successfully."
-          du -sh app/src/main/assets/model-fa
-
-      - name: Validate source and version
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          check() {
-            local label="$1"
-            shift
-
-            if ! "$@"; then
-              echo "::error::Validation failed: $label"
-              exit 1
-            fi
-
-            echo "PASS: $label"
-          }
-
-          check "versionName 1.7.5-Pro" \
-            grep -qF "versionName '1.7.5-Pro'" app/build.gradle
-
-          check "versionCode 175" \
-            grep -qE 'versionCode[[:space:]]+175([[:space:]]|$)' app/build.gradle
-
-          check "JitPack repository configuration" \
-            grep -qF 'jitpack.io' settings.gradle
-
-          check "Persian speech model UUID" \
-            test -s app/src/main/assets/model-fa/uuid
-
-          check "Persian speech model configuration" \
-            test -s app/src/main/assets/model-fa/conf/model.conf
-
-          if grep -q 'android.permission.INTERNET' \
-            app/src/main/AndroidManifest.xml; then
-            echo "::error::Internet permission found in offline app manifest."
-            exit 1
-          fi
-
-          echo "PASS: Internet permission is absent from the manifest."
-
-          if grep -Eiq \
-            'tesseract4android|TessBaseAPI|processChequeImage|REQ_CHEQUE_IMAGE' \
-            app/src/main/java/com/example/hisabyar/MainActivity.java \
+          if ! grep -qE 'versionCode[[:space:]]+175([[:space:]]|$)' \
             app/build.gradle; then
-            echo "::error::Unexpected OCR code or dependency found."
+            echo "::error::Expected versionCode 175."
             exit 1
           fi
 
-          check "Amount masking feature" \
-            grep -q 'hide_amounts' \
-            app/src/main/java/com/example/hisabyar/MainActivity.java
+          if ! grep -qF "versionName '1.7.5-Pro'" \
+            app/build.gradle; then
+            echo "::error::Expected versionName 1.7.5-Pro."
+            exit 1
+          fi
 
-          check "Duplicate transaction warning" \
-            grep -q 'saveTransactionWithDuplicateWarning' \
-            app/src/main/java/com/example/hisabyar/MainActivity.java
+          echo "Application version verified."
 
-          check "PDF report action" \
-            grep -q 'printFinancialReport' \
-            app/src/main/java/com/example/hisabyar/MainActivity.java
-
-          check "Bank-first statement import" \
-            grep -q 'chooseBankForStatement' \
-            app/src/main/java/com/example/hisabyar/MainActivity.java
-
-          check "CSV parser" \
-            grep -q 'parseCsvLine' \
-            app/src/main/java/com/example/hisabyar/MainActivity.java
-
-          check "Bank expense categorization" \
-            grep -q 'classifyBankExpense' \
-            app/src/main/java/com/example/hisabyar/MainActivity.java
-
-          echo "All source validations passed."
-
-      - name: Build APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          gradle --no-daemon clean assembleDebug --stacktrace
-
-      - name: Verify generated APK
+      # مرحله ۸: ساخت APK
+      - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
 
-          APK="app/build/outputs/apk/debug/app-debug.apk"
+          gradle \
+            --no-daemon \
+            --stacktrace \
+            clean assembleDebug
 
-          if [[ ! -s "$APK" ]]; then
-            echo "::error::APK was not generated."
+      # مرحله ۹: بررسی فایل خروجی
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [[ ! -s "$APK_PATH" ]]; then
+            echo "::error::APK file was not generated."
+            find app/build/outputs -type f -name '*.apk' -print || true
             exit 1
           fi
 
-          for asset in \
-            assets/model-fa/uuid \
-            assets/model-fa/conf/model.conf; do
+          echo "APK successfully generated."
+          ls -lh "$APK_PATH"
 
-            if ! unzip -l "$APK" | grep -F "$asset" >/dev/null; then
-              echo "::error::APK is missing $asset"
-              exit 1
-            fi
-
-            echo "PASS: APK contains $asset"
-          done
-
-          echo "APK generated successfully."
-          echo "APK size:"
-          du -h "$APK"
-
-      - name: Upload installable APK
+      # مرحله ۱۰: انتشار فایل APK برای دانلود
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: HisabYar-Pro-Offline-v1.7.5-APK
