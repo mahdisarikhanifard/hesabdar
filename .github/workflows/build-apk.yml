@@ -30,9 +30,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="./HisabYar_Pro_Offline_v1.8.4_DateFirst_BankImport.zip"
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.8.4_RestoreAutoBackups.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
-            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.8.4*DateFirst*BankImport*.zip' -print -quit || true)"
+            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.8.4*RestoreAutoBackups*.zip' -print -quit || true)"
           fi
           if [[ -z "${ZIP_FILE:-}" || ! -s "$ZIP_FILE" ]]; then
             echo "::error::Missing v1.8.4 source ZIP in repository root."
@@ -154,7 +154,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-v1.8.4-DateFirst-APK
+          name: HisabYar-Pro-Offline-v1.8.4-RestoreAutoBackups-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
