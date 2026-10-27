@@ -88,7 +88,7 @@ jobs:
           grep -qE 'versionCode[[:space:]]+186([[:space:]]|$)' app/build.gradle
           grep -qF "versionName '1.8.6-Pro'" app/build.gradle
           grep -qF 'private void importBackup()' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -qF 'Could not create snapshot before listing backups' app/src/main/java/com/example/hisabyar/MainActivity.java
+          grep -qF 'Snapshot before listing failed' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'انتخاب فایل دستی' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'collectAutomaticBackupFiles' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'تعداد چک‌های منطبق' app/src/main/java/com/example/hisabyar/MainActivity.java
