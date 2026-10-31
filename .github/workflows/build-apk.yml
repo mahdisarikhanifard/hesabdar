@@ -47,7 +47,6 @@ jobs:
             echo "::error::ZIP does not contain app/build.gradle."
             exit 1
           fi
-          # Replace stale repository project files with the exact source from the ZIP.
           cp -a "$PROJECT_ROOT"/. .
           test -s app/src/main/java/com/example/hisabyar/MainActivity.java
           test -s app/build.gradle
