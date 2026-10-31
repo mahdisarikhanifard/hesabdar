@@ -85,7 +85,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -qE 'versionCode[[:space:]]+190([[:space:]]|$)' app/build.gradle
+          grep -qE 'versionCode[[:space:]]+191([[:space:]]|$)' app/build.gradle
           grep -qF "versionName '1.9.1-Pro-SmartBankCapture'" app/build.gradle
           grep -qF 'private void importBackup()' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'hasMeaningfulUserData' app/src/main/java/com/example/hisabyar/MainActivity.java
@@ -99,12 +99,12 @@ jobs:
           grep -qF 'ساعت استخراج‌شده:' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'confirm_bank_messages_on_start' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'reviewNextBankCandidate' app/src/main/java/com/example/hisabyar/MainActivity.java
-          grep -qF 'isLikelyBankMessage' app/src/main/java/com/example/hisabyar/BankSmsReceiver.java
-          grep -qF 'isLikelyBankTransaction' app/src/main/java/com/example/hisabyar/BankNotificationListener.java
+          grep -qF 'isCandidate' app/src/main/java/com/example/hisabyar/BankSmsReceiver.java
+          grep -qF 'isCandidate' app/src/main/java/com/example/hisabyar/BankNotificationListener.java
           grep -qF 'Do not guess from arbitrary numeric cells' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'هیچ تراکنشی بدون تأیید شما ثبت مالی نشد' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'شناسه فرستنده/برنامه:' app/src/main/java/com/example/hisabyar/MainActivity.java
-          echo "Version 1.9.1-Pro-SmartBankCapture (190) verified."
+          echo "Version 1.9.1-Pro-SmartBankCapture (191) verified."
           grep -qF "com.tom-roush:pdfbox-android:2.0.27.0" app/build.gradle
           grep -q 'readXlsxRows' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'readTextFromPdf' app/src/main/java/com/example/hisabyar/MainActivity.java
