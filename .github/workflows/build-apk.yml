@@ -1,4 +1,4 @@
-name: Build HisabYar Pro Offline v1.9.0 Bank Import Review
+name: Build HisabYar Pro Offline v1.9.1 Bank Import Review
 
 on:
   workflow_dispatch:
@@ -26,16 +26,16 @@ jobs:
         uses: actions/checkout@v4
 
       # Always use the ZIP source first. Do not build stale app/ files already in the repo.
-      - name: Extract v1.9.0 source ZIP
+      - name: Extract v1.9.1 source ZIP
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="./HisabYar_Pro_Offline_v1.9.0_BankImportReview.zip"
+          ZIP_FILE="./HisabYar_Pro_Offline_v1.9.1_SmartBankCapture.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
-            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.9.0*BankImportReview*.zip' -print -quit || true)"
+            ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*v1.9.1*SmartBankCapture*.zip' -print -quit || true)"
           fi
           if [[ -z "${ZIP_FILE:-}" || ! -s "$ZIP_FILE" ]]; then
-            echo "::error::Missing v1.9.0 source ZIP in repository root."
+            echo "::error::Missing v1.9.1 source ZIP in repository root."
             find . -maxdepth 1 -type f -iname '*.zip' -print | sort || true
             exit 1
           fi
@@ -86,7 +86,7 @@ jobs:
         run: |
           set -euo pipefail
           grep -qE 'versionCode[[:space:]]+190([[:space:]]|$)' app/build.gradle
-          grep -qF "versionName '1.9.0-Pro-BankImportReview'" app/build.gradle
+          grep -qF "versionName '1.9.1-Pro-SmartBankCapture'" app/build.gradle
           grep -qF 'private void importBackup()' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'hasMeaningfulUserData' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'Intentionally do not auto-delete old backups' app/src/main/java/com/example/hisabyar/MainActivity.java
@@ -104,7 +104,7 @@ jobs:
           grep -qF 'Do not guess from arbitrary numeric cells' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'هیچ تراکنشی بدون تأیید شما ثبت مالی نشد' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -qF 'شناسه فرستنده/برنامه:' app/src/main/java/com/example/hisabyar/MainActivity.java
-          echo "Version 1.9.0-Pro-BankImportReview (190) verified."
+          echo "Version 1.9.1-Pro-SmartBankCapture (190) verified."
           grep -qF "com.tom-roush:pdfbox-android:2.0.27.0" app/build.gradle
           grep -q 'readXlsxRows' app/src/main/java/com/example/hisabyar/MainActivity.java
           grep -q 'readTextFromPdf' app/src/main/java/com/example/hisabyar/MainActivity.java
@@ -167,7 +167,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HisabYar-Pro-Offline-v1.8.9-BackupSafe-BackupList-ChequeTotalsSearchFix-APK
+          name: HisabYar-Pro-Offline-v1.9.1-SmartBankCapture-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
