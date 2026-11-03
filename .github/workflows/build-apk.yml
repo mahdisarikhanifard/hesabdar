@@ -25,6 +25,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Extract Android project from uploaded ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_NAME="hesabyar_Pro_Offline_v1.9.3.1_WorkflowFixed.zip"
+          mapfile -t ZIP_FILES < <(find "$GITHUB_WORKSPACE" -type f -name "$ZIP_NAME" -not -path "$GITHUB_WORKSPACE/.git/*" -print)
+          if [[ "${#ZIP_FILES[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one $ZIP_NAME in the repository; found ${#ZIP_FILES[@]} ."
+            find "$GITHUB_WORKSPACE" -type f -name '*.zip' -not -path "$GITHUB_WORKSPACE/.git/*" -print || true
+            exit 1
+          fi
+          EXTRACT_DIR="$(mktemp -d)"
+          trap 'rm -rf "$EXTRACT_DIR"' EXIT
+          unzip -q "${ZIP_FILES[0]}" -d "$EXTRACT_DIR"
+          test -s "$EXTRACT_DIR/app/build.gradle"
+          test -s "$EXTRACT_DIR/app/src/main/AndroidManifest.xml"
+          test -s "$EXTRACT_DIR/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          test -s "$EXTRACT_DIR/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
+          test -s "$EXTRACT_DIR/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
+          rsync -a --exclude='/.github/' "$EXTRACT_DIR/" "$GITHUB_WORKSPACE/"
+          echo "Android project extracted from $ZIP_NAME; checked-out workflow preserved."
+
       - name: Verify source tree
         shell: bash
         run: |
@@ -76,7 +98,7 @@ jobs:
           grep -qF 'reviewNextBankCandidate' app/src/main/java/com/example/hesabyar/MainActivity.java
           grep -qF 'مدیریت ورود هوشمند بانکی' app/src/main/java/com/example/hesabyar/MainActivity.java
           grep -qF 'showUnifiedBankTextEntry' app/src/main/java/com/example/hesabyar/MainActivity.java
-          test "$(grep -c 'addWideButton("مدیریت ورود هوشمند بانکی"' app/src/main/java/com/example/hesabyar/MainActivity.java)" -eq 1
+          test "$(grep -c 'addWideButton(\"مدیریت ورود هوشمند بانکی\"' app/src/main/java/com/example/hesabyar/MainActivity.java)" -eq 1
           grep -qF 'isCandidate' app/src/main/java/com/example/hesabyar/BankSmsReceiver.java
           grep -qF 'isCandidate' app/src/main/java/com/example/hesabyar/BankNotificationListener.java
           grep -qF 'Do not guess from arbitrary numeric cells' app/src/main/java/com/example/hesabyar/MainActivity.java
