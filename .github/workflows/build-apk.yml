@@ -31,22 +31,28 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: |
-          sdkmanager --install "platform-tools"
-          sdkmanager --install "platforms;android-35"
-          sdkmanager --install "build-tools;35.0.0"
+        with:
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
+          accept-android-sdk-licenses: true
 
       - name: Find and extract source ZIP
+        shell: bash
         run: |
+          set -e
+
           ZIP_FILE=$(find . -type f \
             -iname "hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip" \
             -print -quit)
 
           if [ -z "$ZIP_FILE" ]; then
             echo "ERROR: Source ZIP was not found."
-            echo "Expected: hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
+            echo "Expected file:"
+            echo "hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
+            echo "Files in repository:"
+            find . -maxdepth 3 -type f
             exit 1
           fi
 
@@ -56,51 +62,67 @@ jobs:
           unzip -q "$ZIP_FILE" -d extracted
 
       - name: Locate Android project
+        shell: bash
         run: |
-          PROJECT_DIR=$(find extracted -type f \
-            -name "settings.gradle" \
-            -o -name "settings.gradle.kts" \
-            | head -n 1)
+          set -e
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: settings.gradle or settings.gradle.kts not found."
-            find extracted -maxdepth 4 -type f
+          SETTINGS_FILE=$(find extracted -type f \
+            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
+            -print -quit)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: Android project settings file was not found."
+            echo "Extracted files:"
+            find extracted -maxdepth 5 -type f
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$PROJECT_DIR")
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Android project found at: $PROJECT_DIR"
 
       - name: Verify project files
+        shell: bash
         run: |
-          echo "Checking Android project..."
+          set -e
 
-          test -f "$PROJECT_DIR/app/build.gradle" \
-            || test -f "$PROJECT_DIR/app/build.gradle.kts"
+          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && \
+             [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: app/build.gradle or app/build.gradle.kts not found."
+            exit 1
+          fi
 
-          test -d "$PROJECT_DIR/app/src/main"
+          if [ ! -d "$PROJECT_DIR/app/src/main" ]; then
+            echo "ERROR: app/src/main folder not found."
+            exit 1
+          fi
 
-          echo "Project files found."
+          if [ ! -f "$PROJECT_DIR/gradlew" ]; then
+            echo "ERROR: Gradle wrapper (gradlew) not found."
+            exit 1
+          fi
+
+          echo "Project structure verified."
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build Debug APK
+        shell: bash
         run: |
+          set -e
+
           cd "$PROJECT_DIR"
+          chmod +x gradlew
 
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew --no-daemon assembleDebug
-          else
-            echo "ERROR: Gradle wrapper not found."
-            exit 1
-          fi
+          ./gradlew --no-daemon assembleDebug
 
-      - name: Find APK
+      - name: Find and prepare APK
+        shell: bash
         run: |
+          set -e
+
           APK_FILE=$(find "$PROJECT_DIR/app/build/outputs/apk" \
             -type f -name "*.apk" \
             -print -quit)
@@ -111,10 +133,11 @@ jobs:
           fi
 
           mkdir -p output
+
           cp "$APK_FILE" \
             "output/hesabyar-Pro-Offline-v1.9.3.apk"
 
-          echo "APK copied to output folder."
+          echo "APK created successfully."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
