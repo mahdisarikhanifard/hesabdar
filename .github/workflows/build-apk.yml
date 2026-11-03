@@ -1,15 +1,10 @@
 name: Build hesabyar APK
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-      - master
-    paths:
-      - "**"
-      - ".github/workflows/build-apk.yml"
-
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,65 +25,65 @@ jobs:
           java-version: "17"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: ""
-          accept-android-sdk-licenses: true
+        uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
-        shell: bash
         run: |
-          set -e
-
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Find and extract source ZIP
-        shell: bash
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Extract source ZIP
         run: |
           set -e
 
-          ZIP_FILE=$(find . -type f \
-            -iname "hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip" \
-            -print -quit)
+          ZIP_FILE="hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Source ZIP was not found."
-            echo "Expected:"
-            echo "hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
-            echo "Repository files:"
-            find . -maxdepth 4 -type f
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: Source ZIP was not found:"
+            ls -la
             exit 1
           fi
-
-          echo "Found source ZIP: $ZIP_FILE"
 
           mkdir -p extracted
           unzip -q "$ZIP_FILE" -d extracted
 
+          echo "ZIP extracted successfully."
+
       - name: Locate Android project
-        shell: bash
         run: |
           set -e
 
-          SETTINGS_FILE=$(find extracted -type f \
-            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-            -print -quit)
+          PROJECT_DIR=""
 
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: Android project settings file was not found."
+          while IFS= read -r SETTINGS_FILE; do
+            CANDIDATE="$(dirname "$SETTINGS_FILE")"
+
+            if [ -f "$CANDIDATE/app/build.gradle" ] || \
+               [ -f "$CANDIDATE/app/build.gradle.kts" ]; then
+              PROJECT_DIR="$CANDIDATE"
+              break
+            fi
+          done < <(
+            find extracted -type f \
+              \( -name "settings.gradle" -o -name "settings.gradle.kts" \)
+          )
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android project was not found."
             find extracted -maxdepth 5 -type f
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project found at: $PROJECT_DIR"
+          echo "Project directory: $PROJECT_DIR"
 
       - name: Verify project files
-        shell: bash
         run: |
           set -e
 
@@ -103,34 +98,27 @@ jobs:
             exit 1
           fi
 
-          if [ ! -f "$PROJECT_DIR/gradlew" ]; then
-            echo "ERROR: Gradle wrapper was not found."
-            exit 1
-          fi
-
           echo "Project structure verified."
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build Debug APK
-        shell: bash
+      - name: Build APK
         run: |
           set -e
-
           cd "$PROJECT_DIR"
-          chmod +x gradlew
 
-          ./gradlew --no-daemon assembleDebug
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew --no-daemon assembleDebug
+          else
+            echo "Gradle wrapper is missing. Using installed Gradle."
+            gradle --no-daemon assembleDebug
+          fi
 
-      - name: Find and prepare APK
-        shell: bash
+      - name: Find APK
         run: |
           set -e
 
-          APK_FILE=$(find "$PROJECT_DIR/app/build/outputs/apk" \
-            -type f -name "*.apk" \
-            -print -quit)
+          APK_FILE="$(find "$PROJECT_DIR/app/build/outputs/apk" \
+            -type f -name "*.apk" -print -quit)"
 
           if [ -z "$APK_FILE" ]; then
             echo "ERROR: APK was not generated."
@@ -138,16 +126,13 @@ jobs:
           fi
 
           mkdir -p output
+          cp "$APK_FILE" output/hesabyar.apk
 
-          cp "$APK_FILE" \
-            "output/hesabyar-Pro-Offline-v1.9.3.apk"
-
-          echo "APK created successfully."
+          echo "APK copied to output/hesabyar.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-Pro-Offline-v1.9.3-APK
-          path: output/hesabyar-Pro-Offline-v1.9.3.apk
+          name: hesabyar-Pro-Offline-APK
+          path: output/hesabyar.apk
           if-no-files-found: error
-          retention-days: 14
