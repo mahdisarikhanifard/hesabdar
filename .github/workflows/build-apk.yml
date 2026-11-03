@@ -31,12 +31,17 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
-          accept-android-sdk-licenses: true
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -e
+
+          yes | sdkmanager --licenses
+
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
 
       - name: Find and extract source ZIP
         shell: bash
@@ -49,9 +54,7 @@ jobs:
 
           if [ -z "$ZIP_FILE" ]; then
             echo "ERROR: Source ZIP was not found."
-            echo "Expected file:"
-            echo "hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
-            echo "Files in repository:"
+            echo "Expected: hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
             find . -maxdepth 3 -type f
             exit 1
           fi
@@ -72,7 +75,6 @@ jobs:
 
           if [ -z "$SETTINGS_FILE" ]; then
             echo "ERROR: Android project settings file was not found."
-            echo "Extracted files:"
             find extracted -maxdepth 5 -type f
             exit 1
           fi
@@ -89,17 +91,17 @@ jobs:
 
           if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && \
              [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle or app/build.gradle.kts not found."
+            echo "ERROR: App Gradle file was not found."
             exit 1
           fi
 
           if [ ! -d "$PROJECT_DIR/app/src/main" ]; then
-            echo "ERROR: app/src/main folder not found."
+            echo "ERROR: app/src/main folder was not found."
             exit 1
           fi
 
           if [ ! -f "$PROJECT_DIR/gradlew" ]; then
-            echo "ERROR: Gradle wrapper (gradlew) not found."
+            echo "ERROR: Gradle wrapper was not found."
             exit 1
           fi
 
