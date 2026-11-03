@@ -29,18 +29,16 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      -       - name: Set up Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools'
+          packages: ""
           accept-android-sdk-licenses: true
 
       - name: Install Android SDK packages
         shell: bash
         run: |
           set -e
-
-          yes | sdkmanager --licenses
 
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
@@ -57,8 +55,10 @@ jobs:
 
           if [ -z "$ZIP_FILE" ]; then
             echo "ERROR: Source ZIP was not found."
-            echo "Expected: hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
-            find . -maxdepth 3 -type f
+            echo "Expected:"
+            echo "hesabyar_Pro_Offline_v1.9.3_GitHubReady.zip"
+            echo "Repository files:"
+            find . -maxdepth 4 -type f
             exit 1
           fi
 
