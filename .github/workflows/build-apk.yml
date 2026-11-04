@@ -1,71 +1,46 @@
-
-name: Build hesabyar Pro Offline
+name: Inspect Hesabyar Source ZIP
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - "**"
-      - ".github/workflows/build-apk.yml"
-
-permissions:
-  contents: read
 
 jobs:
   inspect:
-    name: Inspect Android project structure
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show repository root
+      - name: Show repository files
         run: |
-          echo "Repository root:"
-          pwd
-          echo ""
-          echo "Root directory contents:"
+          echo "===== Repository root ====="
           ls -la
 
-      - name: Find Android Gradle project files
-        run: |
-          echo "Searching for Android Gradle project files..."
+          echo "===== ZIP source files ====="
+          find . -maxdepth 5 -type f -iname "*.zip"
 
-          find . -maxdepth 8 -type f \( \
+      - name: Inspect v1.9.4 source ZIP
+        run: |
+          ZIP="./hesabyar_Pro_Offline_v1.9.4_BankAmountFix_Source.zip"
+
+          if [ ! -f "$ZIP" ]; then
+            echo "ERROR: Source ZIP not found:"
+            echo "$ZIP"
+            exit 1
+          fi
+
+          echo "===== Complete ZIP file listing ====="
+          unzip -l "$ZIP"
+
+      - name: Search Android project files in repository
+        run: |
+          echo "===== Gradle and Android project files ====="
+
+          find . -type f \( \
             -name "settings.gradle" -o \
             -name "settings.gradle.kts" -o \
             -name "build.gradle" -o \
             -name "build.gradle.kts" -o \
             -name "gradlew" -o \
             -name "AndroidManifest.xml" \
-          \) -print
-
-      - name: Find ZIP source archives
-        run: |
-          echo "Searching for ZIP files..."
-
-          find . -maxdepth 5 -type f -iname "*.zip" -print
-
-      - name: Check project root candidates
-        run: |
-          echo "Checking common Android project locations..."
-
-          for dir in \
-            "." \
-            "./app" \
-            "./source" \
-            "./hesabyar" \
-            "./hesabyar_Pro_Offline" \
-            "./source/hesabyar" \
-            "./source/hesabyar_Pro_Offline"
-          do
-            if [ -d "$dir" ]; then
-              echo ""
-              echo "Directory: $dir"
-              ls -la "$dir"
-            fi
-          done
+          \) -not -path "./.git/*" -print
