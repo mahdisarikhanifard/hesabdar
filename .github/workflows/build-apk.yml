@@ -1,46 +1,76 @@
-name: Inspect Hesabyar Source ZIP
+name: Build Hesabyar Pro Offline 1.9.5
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'hesabyar_Pro_Offline_v1.9.5_BankAmountExtraction_Fixed_Source.zip'
+      - '.github/workflows/build-apk.yml'
 
 jobs:
-  inspect:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show repository files
-        run: |
-          echo "===== Repository root ====="
-          ls -la
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-          echo "===== ZIP source files ====="
-          find . -maxdepth 5 -type f -iname "*.zip"
+      - name: Install Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
 
-      - name: Inspect v1.9.4 source ZIP
+      - name: Extract Hesabyar 1.9.5 source
         run: |
-          ZIP="./hesabyar_Pro_Offline_v1.9.4_BankAmountFix_Source.zip"
+          ZIP="./hesabyar_Pro_Offline_v1.9.5_BankAmountExtraction_Fixed_Source.zip"
 
           if [ ! -f "$ZIP" ]; then
             echo "ERROR: Source ZIP not found:"
             echo "$ZIP"
+            echo "Upload the version 1.9.5 source ZIP to the repository root."
             exit 1
           fi
 
-          echo "===== Complete ZIP file listing ====="
-          unzip -l "$ZIP"
+          mkdir -p extracted_source
+          unzip -q "$ZIP" -d extracted_source
 
-      - name: Search Android project files in repository
+          PROJECT="extracted_source/hesabyar_src"
+
+          if [ ! -f "$PROJECT/settings.gradle" ]; then
+            echo "ERROR: settings.gradle not found"
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT/build.gradle" ]; then
+            echo "ERROR: Root build.gradle not found"
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT/app/build.gradle" ]; then
+            echo "ERROR: app/build.gradle not found"
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT/app/src/main/AndroidManifest.xml" ]; then
+            echo "ERROR: AndroidManifest.xml not found"
+            exit 1
+          fi
+
+          echo "Source project structure verified."
+
+      - name: Build debug APK
         run: |
-          echo "===== Gradle and Android project files ====="
+          gradle -p extracted_source/hesabyar_src assembleDebug --no-daemon
 
-          find . -type f \( \
-            -name "settings.gradle" -o \
-            -name "settings.gradle.kts" -o \
-            -name "build.gradle" -o \
-            -name "build.gradle.kts" -o \
-            -name "gradlew" -o \
-            -name "AndroidManifest.xml" \
-          \) -not -path "./.git/*" -print
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hesabyar-pro-1.9.5-debug-apk
+          path: extracted_source/hesabyar_src/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
