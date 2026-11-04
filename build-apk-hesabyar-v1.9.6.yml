@@ -1,0 +1,150 @@
+name: Build Hesabyar Pro Offline 1.9.6 Voice Model Fix
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'hesabyar_Pro_Offline_v1.9.6_VoiceModelFix_Source.zip'
+      - '.github/workflows/build-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify Hesabyar 1.9.6 with Persian offline voice
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Extract and validate source ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.9.6_VoiceModelFix_Source.zip"
+          if [[ ! -s "$ZIP_FILE" ]]; then
+            echo "::error::Required source ZIP is missing: $ZIP_FILE"
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/hesabyar-source"
+          unzip -q "$ZIP_FILE" -d "$RUNNER_TEMP/hesabyar-source"
+          PROJECT="$RUNNER_TEMP/hesabyar-source/hesabyar_src"
+
+          test -s "$PROJECT/settings.gradle"
+          test -s "$PROJECT/build.gradle"
+          test -s "$PROJECT/app/build.gradle"
+          test -s "$PROJECT/app/src/main/AndroidManifest.xml"
+          test -s "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
+          test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
+
+          grep -qE 'versionCode[[:space:]]+196([[:space:]]|$)' "$PROJECT/app/build.gradle"
+          grep -qF "versionName '1.9.6-Pro-VoiceModelFix'" "$PROJECT/app/build.gradle"
+          grep -qF 'StorageService.unpack(this, "model-fa", "model-fa"' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF 'android.permission.RECORD_AUDIO' "$PROJECT/app/src/main/AndroidManifest.xml"
+
+          rsync -a --exclude="/.github/" "$PROJECT/" "$GITHUB_WORKSPACE/"
+          echo "Project validated and extracted."
+          echo "PROJECT_DIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+
+      - name: Download and bundle Persian Vosk model
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip"
+          MODEL_ZIP="$RUNNER_TEMP/vosk-model-small-fa-0.42.zip"
+          MODEL_TEMP="$RUNNER_TEMP/vosk-fa-extracted"
+
+          curl --fail --location --retry 4 --retry-delay 3 "$MODEL_URL" -o "$MODEL_ZIP"
+          mkdir -p "$MODEL_TEMP"
+          unzip -q "$MODEL_ZIP" -d "$MODEL_TEMP"
+
+          MODEL_DIR="$(find "$MODEL_TEMP" -type f -path '*/am/final.mdl' -print -quit | sed 's#/am/final.mdl$##')"
+          if [[ -z "$MODEL_DIR" ]]; then
+            echo "::error::The Persian Vosk archive did not contain am/final.mdl."
+            exit 1
+          fi
+
+          test -s "$MODEL_DIR/am/final.mdl"
+          test -d "$MODEL_DIR/graph"
+          test -d "$MODEL_DIR/conf"
+
+          if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
+            printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
+          fi
+
+          # StorageService.unpack requires this exact asset marker.
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.9.6' > "$MODEL_DIR/uuid"
+
+          rm -rf app/src/main/assets/model-fa
+          mkdir -p app/src/main/assets
+          cp -a "$MODEL_DIR" app/src/main/assets/model-fa
+
+          test -s app/src/main/assets/model-fa/uuid
+          test -s app/src/main/assets/model-fa/am/final.mdl
+          test -s app/src/main/assets/model-fa/conf/model.conf
+          test -d app/src/main/assets/model-fa/graph
+
+          echo "Bundled model directory:"
+          du -sh app/src/main/assets/model-fa
+          echo "Model files: $(find app/src/main/assets/model-fa -type f | wc -l)"
+
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: gradle --no-daemon clean assembleDebug --stacktrace
+
+      - name: Verify APK and embedded Persian voice assets
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+
+          unzip -Z1 "$APK" | grep -Fx 'assets/model-fa/uuid'
+          unzip -Z1 "$APK" | grep -Fx 'assets/model-fa/am/final.mdl'
+          unzip -Z1 "$APK" | grep -Fx 'assets/model-fa/conf/model.conf'
+
+          COUNT="$(unzip -Z1 "$APK" | grep -c '^assets/model-fa/' || true)"
+          echo "Embedded Vosk asset entries: $COUNT"
+          if [[ "$COUNT" -lt 10 ]]; then
+            echo "::error::APK contains too few Persian Vosk model assets."
+            exit 1
+          fi
+
+          ls -lh "$APK"
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hesabyar-pro-offline-v1.9.6-voice-model-fix-apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
