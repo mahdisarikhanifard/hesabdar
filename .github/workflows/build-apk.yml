@@ -1,10 +1,11 @@
-name: Build Hesabyar Pro Offline 1.9.7 Cheque Exit
+
+name: Build Hesabyar Pro Offline 1.9.8 Incoming Cheque Spent
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.9.7_Pro_ChequeExit_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.9.8_IncomingChequeSpent_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify Hesabyar 1.9.7 Pro Cheque Exit
+    name: Build and verify Hesabyar 1.9.8 Pro Incoming Cheque Spent
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -45,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.9.7_Pro_ChequeExit_Source.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.9.8_IncomingChequeSpent_Source.zip"
 
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
@@ -65,8 +66,8 @@ jobs:
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
-          grep -qE 'versionCode[[:space:]]+197([[:space:]]|$)' "$PROJECT/app/build.gradle"
-          grep -qF "versionName '1.9.7-Pro-ChequeExit'" "$PROJECT/app/build.gradle"
+          grep -qE 'versionCode[[:space:]]+198([[:space:]]|$)' "$PROJECT/app/build.gradle"
+          grep -qF "versionName '1.9.8-Pro-IncomingChequeSpent'" "$PROJECT/app/build.gradle"
 
           grep -qF 'StorageService.unpack(this, "model-fa", "model-fa"' \
             "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
@@ -109,7 +110,7 @@ jobs:
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
 
-          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.9.7' > "$MODEL_DIR/uuid"
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.9.8' > "$MODEL_DIR/uuid"
 
           rm -rf app/src/main/assets/model-fa
           mkdir -p app/src/main/assets
@@ -157,7 +158,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-pro-offline-v1.9.7-cheque-exit-apk
+          name: hesabyar-pro-offline-v1.9.8-incoming-cheque-spent-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
