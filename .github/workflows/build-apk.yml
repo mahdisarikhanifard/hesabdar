@@ -1,10 +1,10 @@
-name: Build Hesabyar Pro Offline 1.9.9 Bank Notification Amount Picker
+name: Build Hesabyar Pro Offline 1.10.0 Bank Notification Amount Picker Fixed
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.9.9_BankNotificationAmountPicker_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.10.0_BankNotificationAmountPicker_Fixed_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify Hesabyar 1.9.9 Pro Bank Notification Amount Picker
+    name: Build and verify Hesabyar 1.10.0 Pro Bank Notification Amount Picker Fixed
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.9.9_BankNotificationAmountPicker_Source.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.0_BankNotificationAmountPicker_Fixed_Source.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
             exit 1
@@ -62,11 +62,15 @@ jobs:
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
-          grep -qE 'versionCode[[:space:]]+199([[:space:]]|$)' "$PROJECT/app/build.gradle"
-          grep -qF "versionName '1.9.9-Pro-BankNotificationAmountPicker'" "$PROJECT/app/build.gradle"
+          grep -qE 'versionCode[[:space:]]+200([[:space:]]|$)' "$PROJECT/app/build.gradle"
+          grep -qF "versionName '1.10.0-Pro-BankNotificationAmountPicker-Fixed'" "$PROJECT/app/build.gradle"
           grep -qF 'private java.util.ArrayList<String> bankNumericChoices' \
             "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           grep -qF 'private void chooseBankCandidateAmount' \
+            "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF 'private void showBankCandidateQueue()' \
+            "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF '()->showBankCandidateQueue()' \
             "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           grep -qF 'android.permission.RECORD_AUDIO' "$PROJECT/app/src/main/AndroidManifest.xml"
 
@@ -96,7 +100,7 @@ jobs:
           if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
-          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.9.9' > "$MODEL_DIR/uuid"
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.0' > "$MODEL_DIR/uuid"
           rm -rf app/src/main/assets/model-fa
           mkdir -p app/src/main/assets
           cp -a "$MODEL_DIR" app/src/main/assets/model-fa
@@ -133,7 +137,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-pro-offline-v1.9.9-bank-notification-amount-picker-apk
+          name: hesabyar-pro-offline-v1.10.0-bank-notification-amount-picker-fixed-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
