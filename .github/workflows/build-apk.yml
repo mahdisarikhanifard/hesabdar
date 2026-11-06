@@ -1,11 +1,10 @@
-
-name: Build Hesabyar Pro Offline 1.9.8 Incoming Cheque Spent
+name: Build Hesabyar Pro Offline 1.9.9 Bank Notification Amount Picker
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.9.8_IncomingChequeSpent_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.9.9_BankNotificationAmountPicker_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -13,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify Hesabyar 1.9.8 Pro Incoming Cheque Spent
+    name: Build and verify Hesabyar 1.9.9 Pro Bank Notification Amount Picker
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -45,9 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.9.8_IncomingChequeSpent_Source.zip"
-
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.9.9_BankNotificationAmountPicker_Source.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
             exit 1
@@ -55,7 +52,6 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/hesabyar-source"
           unzip -q "$ZIP_FILE" -d "$RUNNER_TEMP/hesabyar-source"
-
           PROJECT="$RUNNER_TEMP/hesabyar-source/hesabyar_src"
 
           test -s "$PROJECT/settings.gradle"
@@ -66,65 +62,50 @@ jobs:
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
-          grep -qE 'versionCode[[:space:]]+198([[:space:]]|$)' "$PROJECT/app/build.gradle"
-          grep -qF "versionName '1.9.8-Pro-IncomingChequeSpent'" "$PROJECT/app/build.gradle"
-
-          grep -qF 'StorageService.unpack(this, "model-fa", "model-fa"' \
+          grep -qE 'versionCode[[:space:]]+199([[:space:]]|$)' "$PROJECT/app/build.gradle"
+          grep -qF "versionName '1.9.9-Pro-BankNotificationAmountPicker'" "$PROJECT/app/build.gradle"
+          grep -qF 'private java.util.ArrayList<String> bankNumericChoices' \
             "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
-
-          grep -qF 'android.permission.RECORD_AUDIO' \
-            "$PROJECT/app/src/main/AndroidManifest.xml"
+          grep -qF 'private void chooseBankCandidateAmount' \
+            "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF 'android.permission.RECORD_AUDIO' "$PROJECT/app/src/main/AndroidManifest.xml"
 
           rsync -a --exclude="/.github/" "$PROJECT/" "$GITHUB_WORKSPACE/"
-
-          echo "Project validated and extracted."
           echo "PROJECT_DIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          echo "Source ZIP validated and extracted."
 
       - name: Download and bundle Persian Vosk model
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
         run: |
           set -euo pipefail
-
           MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip"
           MODEL_ZIP="$RUNNER_TEMP/vosk-model-small-fa-0.42.zip"
           MODEL_TEMP="$RUNNER_TEMP/vosk-fa-extracted"
-
           curl --fail --location --retry 4 --retry-delay 3 "$MODEL_URL" -o "$MODEL_ZIP"
-
           mkdir -p "$MODEL_TEMP"
           unzip -q "$MODEL_ZIP" -d "$MODEL_TEMP"
-
           MODEL_DIR="$(find "$MODEL_TEMP" -type f -path '*/am/final.mdl' -print -quit | sed 's#/am/final.mdl$##')"
-
           if [[ -z "$MODEL_DIR" ]]; then
             echo "::error::The Persian Vosk archive did not contain am/final.mdl."
             exit 1
           fi
-
           test -s "$MODEL_DIR/am/final.mdl"
           test -d "$MODEL_DIR/graph"
           test -d "$MODEL_DIR/conf"
-
           if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
-
-          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.9.8' > "$MODEL_DIR/uuid"
-
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.9.9' > "$MODEL_DIR/uuid"
           rm -rf app/src/main/assets/model-fa
           mkdir -p app/src/main/assets
-
           cp -a "$MODEL_DIR" app/src/main/assets/model-fa
-
           test -s app/src/main/assets/model-fa/uuid
           test -s app/src/main/assets/model-fa/am/final.mdl
           test -s app/src/main/assets/model-fa/conf/model.conf
           test -d app/src/main/assets/model-fa/graph
-
-          echo "Bundled model directory:"
+          echo "Persian Vosk model files: $(find app/src/main/assets/model-fa -type f | wc -l)"
           du -sh app/src/main/assets/model-fa
-          echo "Model files: $(find app/src/main/assets/model-fa -type f | wc -l)"
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
@@ -136,29 +117,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-
           unzip -Z1 "$APK" | grep -Fx 'assets/model-fa/uuid'
           unzip -Z1 "$APK" | grep -Fx 'assets/model-fa/am/final.mdl'
           unzip -Z1 "$APK" | grep -Fx 'assets/model-fa/conf/model.conf'
-
           COUNT="$(unzip -Z1 "$APK" | grep -c '^assets/model-fa/' || true)"
-
-          echo "Embedded Vosk asset entries: $COUNT"
-
+          echo "Embedded Persian Vosk asset entries: $COUNT"
           if [[ "$COUNT" -lt 10 ]]; then
             echo "::error::APK contains too few Persian Vosk model assets."
             exit 1
           fi
-
           ls -lh "$APK"
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-pro-offline-v1.9.8-incoming-cheque-spent-apk
+          name: hesabyar-pro-offline-v1.9.9-bank-notification-amount-picker-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
