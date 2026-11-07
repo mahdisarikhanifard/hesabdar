@@ -1,4 +1,3 @@
-
 name: Build Hesabyar Pro Offline 1.10.4 Voice Widget
 
 on:
@@ -63,6 +62,7 @@ jobs:
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
+          # Print a clear diagnostic for each required file/content check.
           require_file() {
             if [[ -s "$1" ]]; then echo "PASS: file exists: $1"; else echo "::error::FAIL: required file missing or empty: $1"; exit 1; fi
           }
@@ -95,7 +95,7 @@ jobs:
           require_file "$PROJECT/app/src/main/res/xml/hesabyar_voice_widget_info.xml"
           require_fixed '.HesabyarVoiceWidgetProvider' "$PROJECT/app/src/main/AndroidManifest.xml"
           require_fixed 'ACTION_WIDGET_VOICE' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
-          require_fixed 'android.appwidget.action.APPWIDGET_UPDATE' "$PROJECT/app/src/main/java/com/example/hesabyar/HesabyarVoiceWidgetProvider.java"
+          require_fixed 'AppWidgetManager.ACTION_APPWIDGET_UPDATE' "$PROJECT/app/src/main/java/com/example/hesabyar/HesabyarVoiceWidgetProvider.java"
           require_fixed 'android:widgetCategory="home_screen"' "$PROJECT/app/src/main/res/xml/hesabyar_voice_widget_info.xml"
 
           rsync -a --exclude="/.github/" "$PROJECT/" "$GITHUB_WORKSPACE/"
