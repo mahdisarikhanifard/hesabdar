@@ -1,10 +1,11 @@
-name: Build Hesabyar Pro Offline 1.10.2 Bank SMS Parser Rework
+
+name: Build Hesabyar Pro Offline 1.10.3 Bank Amount Picker Fix
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.10.2_BankSmsParserRework_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.10.3_BankAmountPickerFix_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify Hesabyar 1.10.2 Pro Bank SMS Parser Rework
+    name: Build and verify Hesabyar 1.10.3 Pro Bank Amount Picker Fix
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -44,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.2_BankSmsParserRework_Source.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.3_BankAmountPickerFix_Source.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
             exit 1
@@ -62,14 +63,17 @@ jobs:
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
-          grep -qF "applicationId 'com.example.hesabyarpro'" "$PROJECT/app/build.gradle"
-          grep -qE 'versionCode[[:space:]]+202([[:space:]]|$)' "$PROJECT/app/build.gradle"
-          grep -qF "versionName '1.10.2-Pro-BankSmsParserRework'" "$PROJECT/app/build.gradle"
+          grep -qE 'applicationId[[:space:]]+\x27com.example.hesabyarpro\x27' "$PROJECT/app/build.gradle"
+          grep -qE 'versionCode[[:space:]]+203([[:space:]]|$)' "$PROJECT/app/build.gradle"
+          grep -qF "versionName '1.10.3-Pro-BankAmountPickerFix'" "$PROJECT/app/build.gradle"
           grep -qF 'private long extractBankAmount(String text,String normalized)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           grep -qF 'private boolean isSaderatPosDebit(String text)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           grep -qF 'private java.util.ArrayList<String> bankNumericChoices' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           grep -qF 'private void chooseBankCandidateAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
-          grep -qF 'حساب‌یار پرو • نسخه ۱.۱۰.۲' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF 'private void showManualBankAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF 'private void finishBankCandidateAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF 'new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          grep -qF 'حساب‌یار پرو • نسخه ۱.۱۰.۳' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           grep -qF 'android.permission.RECORD_AUDIO' "$PROJECT/app/src/main/AndroidManifest.xml"
 
           rsync -a --exclude="/.github/" "$PROJECT/" "$GITHUB_WORKSPACE/"
@@ -98,7 +102,7 @@ jobs:
           if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
-          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.2' > "$MODEL_DIR/uuid"
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.3' > "$MODEL_DIR/uuid"
           rm -rf app/src/main/assets/model-fa
           mkdir -p app/src/main/assets
           cp -a "$MODEL_DIR" app/src/main/assets/model-fa
@@ -135,7 +139,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-pro-offline-v1.10.2-bank-sms-parser-rework-apk
+          name: hesabyar-pro-offline-v1.10.3-bank-amount-picker-fix-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
