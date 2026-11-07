@@ -1,11 +1,10 @@
-
 name: Build Hesabyar Pro Offline 1.10.4 Voice Widget
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.10.4_VoiceWidget_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.10.4_VoiceWidget_ResourceFix_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -45,7 +44,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.4_VoiceWidget_Source.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.4_VoiceWidget_ResourceFix_Source.zip"
+
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
             exit 1
