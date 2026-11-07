@@ -62,7 +62,7 @@ jobs:
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
-          grep -qE 'applicationId[[:space:]]+\x27com.example.hesabyarpro\x27' "$PROJECT/app/build.gradle"
+          grep -qF "applicationId 'com.example.hesabyarpro'" "$PROJECT/app/build.gradle"
           grep -qE 'versionCode[[:space:]]+202([[:space:]]|$)' "$PROJECT/app/build.gradle"
           grep -qF "versionName '1.10.2-Pro-BankSmsParserRework'" "$PROJECT/app/build.gradle"
           grep -qF 'private long extractBankAmount(String text,String normalized)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
