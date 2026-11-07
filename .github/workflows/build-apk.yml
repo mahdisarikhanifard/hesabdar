@@ -1,10 +1,11 @@
-name: Build Hesabyar Pro Offline 1.10.3 Bank Amount Picker Fix
+
+name: Build Hesabyar Pro Offline 1.10.4 Voice Widget
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.10.3_BankAmountPickerFix_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.10.4_VoiceWidget_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify Hesabyar 1.10.3 Pro Bank Amount Picker Fix
+    name: Build and verify Hesabyar 1.10.4 Pro Voice Widget
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -44,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.3_BankAmountPickerFix_Source.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.4_VoiceWidget_Source.zip"
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
             exit 1
@@ -62,7 +63,6 @@ jobs:
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           test -s "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
-          # Print a clear diagnostic for each required file/content check.
           require_file() {
             if [[ -s "$1" ]]; then echo "PASS: file exists: $1"; else echo "::error::FAIL: required file missing or empty: $1"; exit 1; fi
           }
@@ -79,8 +79,8 @@ jobs:
           require_file "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
           require_fixed "applicationId 'com.example.hesabyarpro'" "$PROJECT/app/build.gradle"
-          require_fixed 'versionCode 203' "$PROJECT/app/build.gradle"
-          require_fixed "versionName '1.10.3-Pro-BankAmountPickerFix'" "$PROJECT/app/build.gradle"
+          require_fixed 'versionCode 204' "$PROJECT/app/build.gradle"
+          require_fixed "versionName '1.10.4-Pro-VoiceWidget'" "$PROJECT/app/build.gradle"
           require_fixed 'private long extractBankAmount(String text,String normalized)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean isSaderatPosDebit(String text)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private java.util.ArrayList<String> bankNumericChoices' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
@@ -88,8 +88,15 @@ jobs:
           require_fixed 'private void showManualBankAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private void finishBankCandidateAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
-          require_fixed 'حساب‌یار پرو • نسخه ۱.۱۰.۳' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'حساب‌یار پرو • نسخه ۱.۱۰.۴' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'android.permission.RECORD_AUDIO' "$PROJECT/app/src/main/AndroidManifest.xml"
+          require_file "$PROJECT/app/src/main/java/com/example/hesabyar/HesabyarVoiceWidgetProvider.java"
+          require_file "$PROJECT/app/src/main/res/layout/widget_voice_assistant.xml"
+          require_file "$PROJECT/app/src/main/res/xml/hesabyar_voice_widget_info.xml"
+          require_fixed '.HesabyarVoiceWidgetProvider' "$PROJECT/app/src/main/AndroidManifest.xml"
+          require_fixed 'ACTION_WIDGET_VOICE' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'android.appwidget.action.APPWIDGET_UPDATE' "$PROJECT/app/src/main/java/com/example/hesabyar/HesabyarVoiceWidgetProvider.java"
+          require_fixed 'android:widgetCategory="home_screen"' "$PROJECT/app/src/main/res/xml/hesabyar_voice_widget_info.xml"
 
           rsync -a --exclude="/.github/" "$PROJECT/" "$GITHUB_WORKSPACE/"
           echo "PROJECT_DIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
@@ -117,7 +124,7 @@ jobs:
           if [[ ! -s "$MODEL_DIR/conf/model.conf" ]]; then
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
-          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.3' > "$MODEL_DIR/uuid"
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.4' > "$MODEL_DIR/uuid"
           rm -rf app/src/main/assets/model-fa
           mkdir -p app/src/main/assets
           cp -a "$MODEL_DIR" app/src/main/assets/model-fa
@@ -154,7 +161,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-pro-offline-v1.10.3-bank-amount-picker-fix-apk
+          name: hesabyar-pro-offline-v1.10.4-voice-widget-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
