@@ -1,10 +1,10 @@
-name: Build Hesabyar Pro Offline 1.10.6 Bank Accounting Audit
+name: Build Hesabyar Pro Offline 1.10.7 Cheque Archive
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.10.6_BankAccountingAudit_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.10.7_ChequeArchive_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify Hesabyar 1.10.6 Pro Bank Accounting Audit
+    name: Build and verify Hesabyar 1.10.7 Pro Cheque Archive
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.6_BankAccountingAudit_Source.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.7_ChequeArchive_Source.zip"
 
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
@@ -90,8 +90,8 @@ jobs:
           require_file "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
           require_fixed "applicationId 'com.example.hesabyarpro'" "$PROJECT/app/build.gradle"
-          require_fixed 'versionCode 206' "$PROJECT/app/build.gradle"
-          require_fixed "versionName '1.10.6-Pro-BankAccountingAudit'" "$PROJECT/app/build.gradle"
+          require_fixed 'versionCode 207' "$PROJECT/app/build.gradle"
+          require_fixed "versionName '1.10.7-Pro-ChequeArchive'" "$PROJECT/app/build.gradle"
 
           require_fixed 'private long extractBankAmount(String text,String normalized)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean isSaderatPosDebit(String text)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
@@ -99,6 +99,10 @@ jobs:
           require_fixed 'private void chooseBankCandidateAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private void showManualBankAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private void finishBankCandidateAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'private void showChequeArchive()' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'همه موارد آرشیو' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'status NOT IN (' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'private boolean isArchivedChequeStatus(String status)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private String bankInboxSourceKey(String source,String raw)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean bankNamesMatch(String accountBank,String detectedBank)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private long bankBalance()' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
@@ -156,7 +160,7 @@ jobs:
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
 
-          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.6' > "$MODEL_DIR/uuid"
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.7' > "$MODEL_DIR/uuid"
 
           rm -rf app/src/main/assets/model-fa
           mkdir -p app/src/main/assets
@@ -200,7 +204,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-pro-offline-v1.10.6-bank-accounting-audit-apk
+          name: hesabyar-pro-offline-v1.10.7-cheque-archive-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
