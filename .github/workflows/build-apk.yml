@@ -1,10 +1,10 @@
-name: Build Hesabyar Pro Offline 1.10.4 Voice Widget
+name: Build Hesabyar Pro Offline 1.10.5 Instant Bank Review
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'hesabyar_Pro_Offline_v1.10.4_VoiceWidget_ResourceFix_Source.zip'
+      - 'hesabyar_Pro_Offline_v1.10.5_InstantBankReview_Source.zip'
       - '.github/workflows/build-apk.yml'
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and verify Hesabyar 1.10.4 Pro Voice Widget
+    name: Build and verify Hesabyar 1.10.5 Pro Instant Bank Review
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.4_VoiceWidget_ResourceFix_Source.zip"
+          ZIP_FILE="$GITHUB_WORKSPACE/hesabyar_Pro_Offline_v1.10.5_InstantBankReview_Source.zip"
 
           if [[ ! -s "$ZIP_FILE" ]]; then
             echo "::error::Required source ZIP is missing: $ZIP_FILE"
@@ -90,8 +90,8 @@ jobs:
           require_file "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
           require_fixed "applicationId 'com.example.hesabyarpro'" "$PROJECT/app/build.gradle"
-          require_fixed 'versionCode 204' "$PROJECT/app/build.gradle"
-          require_fixed "versionName '1.10.4-Pro-VoiceWidget'" "$PROJECT/app/build.gradle"
+          require_fixed 'versionCode 205' "$PROJECT/app/build.gradle"
+          require_fixed "versionName '1.10.5-Pro-InstantBankReview'" "$PROJECT/app/build.gradle"
 
           require_fixed 'private long extractBankAmount(String text,String normalized)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean isSaderatPosDebit(String text)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
@@ -101,12 +101,17 @@ jobs:
           require_fixed 'private void finishBankCandidateAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
 
-          require_fixed 'حساب‌یار پرو • نسخه ۱.۱۰.۴' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'حساب‌یار پرو • نسخه ۱.۱۰.۵' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'android.permission.RECORD_AUDIO' "$PROJECT/app/src/main/AndroidManifest.xml"
 
           require_file "$PROJECT/app/src/main/java/com/example/hesabyar/HesabyarVoiceWidgetProvider.java"
           require_file "$PROJECT/app/src/main/res/layout/widget_voice_assistant.xml"
           require_file "$PROJECT/app/src/main/res/xml/hesabyar_voice_widget_info.xml"
+          require_file "$PROJECT/app/src/main/res/values/strings.xml"
+          require_fixed 'android.permission.POST_NOTIFICATIONS' "$PROJECT/app/src/main/AndroidManifest.xml"
+          require_fixed 'ACTION_REVIEW_BANK_CANDIDATE' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'postReviewNotification' "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
+          require_fixed 'BankSmsReceiver.save(this, "اعلان"' "$PROJECT/app/src/main/java/com/example/hesabyar/BankNotificationListener.java"
 
           require_fixed '.HesabyarVoiceWidgetProvider' "$PROJECT/app/src/main/AndroidManifest.xml"
           require_fixed 'ACTION_WIDGET_VOICE' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
@@ -145,7 +150,7 @@ jobs:
             printf '%s\n' '--beam=13.0' '--lattice-beam=6.0' > "$MODEL_DIR/conf/model.conf"
           fi
 
-          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.4' > "$MODEL_DIR/uuid"
+          printf '%s\n' 'hesabyar-vosk-fa-0.42-v1.10.5' > "$MODEL_DIR/uuid"
 
           rm -rf app/src/main/assets/model-fa
           mkdir -p app/src/main/assets
@@ -189,7 +194,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: hesabyar-pro-offline-v1.10.4-voice-widget-apk
+          name: hesabyar-pro-offline-v1.10.5-instant-bank-review-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
