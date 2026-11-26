@@ -102,6 +102,7 @@ jobs:
           require_fixed 'private String bankInboxSourceKey(String source,String raw)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean bankNamesMatch(String accountBank,String detectedBank)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private long bankBalance()' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'private void separateAccountFromSharedGroup(String name)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean isSelectedBankAmountInToman(String raw,long amount)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'body.append("\n")' "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           require_fixed 'new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
