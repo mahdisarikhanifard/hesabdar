@@ -1,4 +1,4 @@
-name: Build Hesabyar Pro Offline 1.10.7 Cheque Archive
+name: Build Hesabyar Pro Offline 1.10.7 Cheque Archive (verified source)
 
 on:
   workflow_dispatch:
@@ -100,8 +100,10 @@ jobs:
           require_fixed 'private void showManualBankAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private void finishBankCandidateAmount' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private void showChequeArchive()' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
-          require_fixed 'همه موارد آرشیو' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
-          require_fixed 'status NOT IN (' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'همه موارد بایگانی' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'private String archivedChequeSql()' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed "status IN ('پاس شد','واریز به حساب','برگشت'" "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'NOT (' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean isArchivedChequeStatus(String status)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private String bankInboxSourceKey(String source,String raw)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'private boolean bankNamesMatch(String accountBank,String detectedBank)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
@@ -111,7 +113,7 @@ jobs:
           require_fixed 'body.append("\n")' "$PROJECT/app/src/main/java/com/example/hesabyar/BankSmsReceiver.java"
           require_fixed 'new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels)' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
 
-          require_fixed 'حساب‌یار پرو • نسخه ۱.۱۰.۶' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
+          require_fixed 'حساب‌یار پرو • نسخه ۱.۱۰.۷' "$PROJECT/app/src/main/java/com/example/hesabyar/MainActivity.java"
           require_fixed 'android.permission.RECORD_AUDIO' "$PROJECT/app/src/main/AndroidManifest.xml"
 
           require_file "$PROJECT/app/src/main/java/com/example/hesabyar/HesabyarVoiceWidgetProvider.java"
