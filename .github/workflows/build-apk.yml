@@ -5,7 +5,6 @@ on:
   push:
     paths:
       - 'hesabyar_Pro_Offline_v1.10.7_ChequeArchive_Source.zip'
-      - '.github/workflows/build-apk.yml'
 
 permissions:
   contents: read
